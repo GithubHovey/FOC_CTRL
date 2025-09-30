@@ -1,7 +1,10 @@
 import QtQuick
-import QtQuick.Controls // 添加Controls模块导入
+import QtQuick.Controls
 import QtQuick.Layouts
 import QtCharts
+
+// 导入自定义模块
+import "qml"
 
 ApplicationWindow {
     id: mainWindow
@@ -80,144 +83,17 @@ ApplicationWindow {
                 border.width: 1
                 border.color: "#464647"
 
-                ColumnLayout {
+                SerialCommunicationModule {
+                    id: serialModule
                     anchors.fill: parent
-                    spacing: 5
                     anchors.margins: 10
-
-                    // 串口通信模块
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        color: "#2D2D30"
-                        border.width: 1
-                        border.color: "#464647"
-                        radius: 5
-
-                        ColumnLayout {
-                            anchors.fill: parent
-                            spacing: 5
-                            anchors.margins: 10
-
-                            Text {
-                                text: qsTr("串口通信")
-                                color: "#FFFFFF"
-                                font.pixelSize: 16
-                                font.bold: true
-                            }
-
-                            // 串口配置区域
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 5
-
-                                ComboBox {
-                                    id: comPortComboBox
-                                    model: ["COM1", "COM2", "COM3", "COM4"]
-                                    background: Rectangle {
-                                        color: "#3C3C3C"
-                                        border.width: 1
-                                        border.color: "#464647"
-                                    }
-                                    contentItem: Text {
-                                        text: comPortComboBox.displayText
-                                        color: "#FFFFFF"
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
-                                        elide: Text.ElideRight
-                                    }
-                                }
-                            }
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 5
-
-                                ComboBox {
-                                    id: baudRateComboBox
-                                    model: ["9600", "19200", "38400", "57600", "115200"]
-                                    currentIndex: 4 // 默认115200
-                                    background: Rectangle {
-                                        color: "#3C3C3C"
-                                        border.width: 1
-                                        border.color: "#464647"
-                                    }
-                                    contentItem: Text {
-                                        text: baudRateComboBox.displayText
-                                        color: "#FFFFFF"
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
-                                        elide: Text.ElideRight
-                                    }
-                                }
-                            }
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 5
-
-                                Button {
-                                    id: connectButton
-                                    text: qsTr("连接")
-                                    Layout.fillWidth: true
-                                    background: Rectangle {
-                                        color: "#3C3C3C"
-                                    }
-                                    contentItem: Text {
-                                        text: qsTr("连接")
-                                        color: "#FFFFFF"
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
-                                    }
-                                }
-                            }
-
-                            // 数据显示区域
-                            Rectangle {
-                                Layout.fillHeight: true
-                                Layout.fillWidth: true
-                                color: "#1E1E1E"
-                                border.width: 1
-                                border.color: "#464647"
-                                // 数据显示内容
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: qsTr("串口数据显示区域")
-                                    color: "#CCCCCC"
-                                }
-                            }
-
-                            // 发送区域
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 5
-
-                                TextField {
-                                    id: sendTextField
-                                    Layout.fillWidth: true
-                                    placeholderText: qsTr("输入发送数据...")
-                                    background: Rectangle {
-                                        color: "#3C3C3C"
-                                        border.width: 1
-                                        border.color: "#464647"
-                                    }
-                                    color: "#FFFFFF"
-                                }
-
-                                Button {
-                                    text: qsTr("发送")
-                                    background: Rectangle {
-                                        color: "#3C3C3C"
-                                    }
-                                    contentItem: Text {
-                                        text: qsTr("发送")
-                                        color: "#FFFFFF"
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
-                                    }
-                                }
-                            }
-                        }
+                    
+                    onConnectClicked: {
+                        console.log("串口连接状态:", serialModule.isConnected)
+                        console.log("串口:", serialModule.comPort, "波特率:", serialModule.baudRate)
+                    }
+                    onSendDataRequested: function(data) {
+                        console.log("发送数据:", data)
                     }
                 }
             }
@@ -236,129 +112,23 @@ ApplicationWindow {
                     spacing: 0  // 移除间距以实现精确比例分割
                     anchors.margins: 10
 
-                    // 上部分 - 曲线图显示区域 (80%)
-                    Rectangle {
-                        id: chartArea
-                        Layout.preferredHeight: parent.height * 0.8
+                    // FOC曲线显示模块 - 包含图表和控制按钮
+                    FOCChartModule {
+                        id: chartModule
                         Layout.fillWidth: true
-                        color: "#1E1E1E"
-                        border.width: 1
-                        border.color: "#464647"
+                        Layout.fillHeight: true
                         
-                        ColumnLayout {
-                            anchors.fill: parent
-                            spacing: 5
-                            anchors.margins: 10
-
-                            Text {
-                                text: qsTr("FOC数据曲线显示")
-                                color: "#FFFFFF"
-                                font.pixelSize: 16
-                                font.bold: true
-                            }
-
-                            // 曲线显示区域
-                            Rectangle {
-                                Layout.fillHeight: true
-                                Layout.fillWidth: true
-                                color: "#000000"
-                                border.width: 1
-                                border.color: "#464647"
-                                // 曲线显示区域
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: qsTr("曲线图将在这里显示")
-                                    color: "#CCCCCC"
-                                }
-                            }
+                        onAddVariableRequested: {
+                            console.log("添加变量")
                         }
-                    }
-
-                    // 中间分隔条
-                    Item {
-                        Layout.preferredHeight: 5
-                        Layout.fillWidth: true
-                    }
-
-                    // 下部分 - 变量添加和控制区域 (20%)
-                    Rectangle {
-                        id: variableControlArea
-                        Layout.preferredHeight: parent.height * 0.2
-                        Layout.fillWidth: true
-                        color: "#2D2D30"
-                        border.width: 1
-                        border.color: "#464647"
-                        radius: 3
-
-                        ColumnLayout {
-                            anchors.fill: parent
-                            spacing: 5
-                            anchors.margins: 10
-
-                            Text {
-                                text: qsTr("变量添加与控制")
-                                color: "#FFFFFF"
-                                font.pixelSize: 14
-                                font.bold: true
-                            }
-
-                            // 变量添加和控制按钮区域
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 10
-
-                                Button {
-                                    text: qsTr("添加变量")
-                                    background: Rectangle {
-                                        color: "#3C3C3C"
-                                    }
-                                    contentItem: Text {
-                                        text: qsTr("添加变量")
-                                        color: "#FFFFFF"
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
-                                    }
-                                }
-
-                                Button {
-                                    text: qsTr("导出数据")
-                                    background: Rectangle {
-                                        color: "#3C3C3C"
-                                    }
-                                    contentItem: Text {
-                                        text: qsTr("导出数据")
-                                        color: "#FFFFFF"
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
-                                    }
-                                }
-
-                                Button {
-                                    text: qsTr("清空曲线")
-                                    background: Rectangle {
-                                        color: "#3C3C3C"
-                                    }
-                                    contentItem: Text {
-                                        text: qsTr("清空曲线")
-                                        color: "#FFFFFF"
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
-                                    }
-                                }
-
-                                Button {
-                                    text: qsTr("暂停显示")
-                                    background: Rectangle {
-                                        color: "#3C3C3C"
-                                    }
-                                    contentItem: Text {
-                                        text: qsTr("暂停显示")
-                                        color: "#FFFFFF"
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
-                                    }
-                                }
-                            }
+                        onExportDataRequested: {
+                            console.log("导出数据")
+                        }
+                        onClearChartRequested: {
+                            console.log("清空曲线")
+                        }
+                        onPauseDisplayRequested: {
+                            console.log("暂停显示")
                         }
                     }
                 }
@@ -379,228 +149,32 @@ ApplicationWindow {
                     anchors.margins: 10
 
                     // 电机模式控制模块
-                    Rectangle {
+                    MotorModeControlModule {
+                        id: motorModeControl
                         Layout.fillWidth: true
                         Layout.preferredHeight: parent.height * 0.33  // 占三分之一
-                        color: "#2D2D30"
-                        border.width: 1
-                        border.color: "#464647"
-                        radius: 5
-
-                        ColumnLayout {
-                            anchors.fill: parent
-                            spacing: 5
-                            anchors.margins: 10
-
-                            Text {
-                                text: qsTr("电机模式控制")
-                                color: "#FFFFFF"
-                                font.pixelSize: 16
-                                font.bold: true
-                            }
-
-                            // 模式选择区域
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 5
-
-                                ComboBox {
-                                    id: controlModeComboBox
-                                    model: ["力矩模式", "速度模式", "位置模式"]
-                                    background: Rectangle {
-                                        color: "#3C3C3C"
-                                        border.width: 1
-                                        border.color: "#464647"
-                                    }
-                                    contentItem: Text {
-                                        text: controlModeComboBox.displayText
-                                        color: "#FFFFFF"
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
-                                        elide: Text.ElideRight
-                                    }
-                                }
-
-                                Button {
-                                    id: enableButton
-                                    text: qsTr("使能")
-                                    background: Rectangle {
-                                        color: "#3C3C3C"
-                                    }
-                                    contentItem: Text {
-                                        text: qsTr("使能")
-                                        color: "#FFFFFF"
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
-                                    }
-                                }
-                            }
-
-                            // 参数调节区域
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 5
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 5
-
-                                    Text {
-                                        text: qsTr("参数值：")
-                                        color: "#FFFFFF"
-                                        Layout.alignment: Qt.AlignVCenter
-                                    }
-
-                                    TextField {
-                                        id: parameterTextField
-                                        width: 60
-                                        text: "50"
-                                        horizontalAlignment: TextInput.AlignHCenter
-                                        background: Rectangle {
-                                            color: "#3C3C3C"
-                                            border.width: 1
-                                            border.color: "#464647"
-                                        }
-                                        color: "#FFFFFF"
-                                    }
-                                }
-
-                                Slider {
-                                    id: parameterSlider
-                                    Layout.fillWidth: true
-                                    from: 0
-                                    to: 100
-                                    value: 50
-                                    background: Rectangle {
-                                        color: "#3C3C3C"
-                                        border.width: 1
-                                        border.color: "#464647"
-                                    }
-                                    handle: Rectangle {
-                                        color: "#FFFFFF"
-                                        width: 16
-                                        height: 16
-                                        radius: 8
-                                    }
-                                }
-                            }
+                        
+                        onEnableToggled: {
+                            console.log("电机使能状态:", motorModeControl.isEnabled)
+                        }
+                        onParameterValueChanged: function(value) {
+                            console.log("参数值改变:", value)
                         }
                     }
 
                     // 电机命令读写模块
-                    Rectangle {
+                    MotorDataReadWriteModule {
+                        id: motorDataRW
                         Layout.fillWidth: true
                         Layout.preferredHeight: parent.height * 0.33  // 占三分之一
-                        color: "#2D2D30"
-                        border.width: 1
-                        border.color: "#464647"
-                        radius: 5
-
-                        ColumnLayout {
-                            anchors.fill: parent
-                            spacing: 5
-                            anchors.margins: 10
-
-                            Text {
-                                text: qsTr("电机变量读写")
-                                color: "#FFFFFF"
-                                font.pixelSize: 16
-                                font.bold: true
-                            }
-
-                            // 数据ID选择区域
-                            ComboBox {
-                                id: dataIdComboBox
-                                Layout.fillWidth: true
-                                model: ["U相电流目标值", "U相电流当前值", "V相电流目标值", "V相电流当前值", "W相电流目标值", "W相电流当前值", "转速目标值", "转速当前值"]
-                                background: Rectangle {
-                                    color: "#3C3C3C"
-                                    border.width: 1
-                                    border.color: "#464647"
-                                }
-                                contentItem: Text {
-                                    text: dataIdComboBox.displayText
-                                    color: "#FFFFFF"
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                    elide: Text.ElideRight
-                                }
-                            }
-
-                            // 数据类型选择区域
-                            ComboBox {
-                                id: dataTypeComboBox
-                                Layout.fillWidth: true
-                                model: ["float", "int", "short"]
-                                currentIndex: 0
-                                background: Rectangle {
-                                    color: "#3C3C3C"
-                                    border.width: 1
-                                    border.color: "#464647"
-                                }
-                                contentItem: Text {
-                                    text: dataTypeComboBox.displayText
-                                    color: "#FFFFFF"
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                    elide: Text.ElideRight
-                                }
-                            }
-
-                            // 数值输入区域
-                            TextField {
-                                id: dataValueTextField
-                                Layout.fillWidth: true
-                                placeholderText: qsTr("输入数值...")
-                                background: Rectangle {
-                                    color: "#3C3C3C"
-                                    border.width: 1
-                                    border.color: "#464647"
-                                }
-                                color: "#FFFFFF"
-                            }
-
-                            // 操作按钮区域
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 5
-
-                                Button {
-                                    text: qsTr("读取")
-                                    Layout.fillWidth: true
-                                    background: Rectangle {
-                                        color: "#3C3C3C"
-                                    }
-                                    contentItem: Text {
-                                        text: qsTr("读取")
-                                        color: "#FFFFFF"
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
-                                    }
-                                }
-
-                                Button {
-                                    text: qsTr("写入")
-                                    Layout.fillWidth: true
-                                    background: Rectangle {
-                                        color: "#3C3C3C"
-                                    }
-                                    contentItem: Text {
-                                        text: qsTr("写入")
-                                        color: "#FFFFFF"
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
-                                    }
-                                }
-                            }
-
-                            // 结果显示区域
-                            Text {
-                                id: resultText
-                                text: qsTr("操作结果将显示在这里")
-                                color: "#CCCCCC"
-                                Layout.fillWidth: true
-                            }
+                        
+                        onReadDataRequested: {
+                            console.log("读取数据 - ID:", motorDataRW.dataId, "类型:", motorDataRW.dataType)
+                            motorDataRW.resultText = "读取成功: " + Math.random().toFixed(2)
+                        }
+                        onWriteDataRequested: {
+                            console.log("写入数据 - ID:", motorDataRW.dataId, "类型:", motorDataRW.dataType, "值:", motorDataRW.dataValue)
+                            motorDataRW.resultText = "写入成功"
                         }
                     }
 
@@ -633,110 +207,18 @@ ApplicationWindow {
         contentItem: Rectangle {
             color: "#2D2D30"
 
-            ColumnLayout {
+            LogModule {
+                id: logModule
                 anchors.fill: parent
-                spacing: 5
                 anchors.margins: 10
-
-                // 日志级别选择区域
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 10
-
-                    CheckBox {
-                        text: qsTr("Debug")
-                        checked: true
-                        background: Rectangle {
-                            color: "transparent"  // 修复：添加引号
-                        }
-                        indicator: Rectangle {
-                            implicitWidth: 20
-                            implicitHeight: 20
-                            border.width: 2
-                            border.color: "#464647"
-                            color: parent.checked ? "#3C3C3C" : "transparent"  // 修复：使用parent.checked
-                        }
-                        contentItem: Text {
-                            text: qsTr("Debug")
-                            color: "#FFFFFF"
-                            verticalAlignment: Text.AlignVCenter
-                        }
-                    }
-
-                    CheckBox {
-                        text: qsTr("Info")
-                        checked: true
-                        background: Rectangle {
-                            color: "transparent"  // 修复：添加引号
-                        }
-                        indicator: Rectangle {
-                            implicitWidth: 20
-                            implicitHeight: 20
-                            border.width: 2
-                            border.color: "#464647"
-                            color: parent.checked ? "#3C3C3C" : "transparent"  // 修复：使用parent.checked
-                        }
-                        contentItem: Text {
-                            text: qsTr("Info")
-                            color: "#FFFFFF"
-                            verticalAlignment: Text.AlignVCenter
-                        }
-                    }
-
-                    CheckBox {
-                        text: qsTr("Warning")
-                        checked: true
-                        background: Rectangle {
-                            color: "transparent"  // 修复：添加引号
-                        }
-                        indicator: Rectangle {
-                            implicitWidth: 20
-                            implicitHeight: 20
-                            border.width: 2
-                            border.color: "#464647"
-                            color: parent.checked ? "#3C3C3C" : "transparent"  // 修复：使用parent.checked
-                        }
-                        contentItem: Text {
-                            text: qsTr("Warning")
-                            color: "#FFFFFF"
-                            verticalAlignment: Text.AlignVCenter
-                        }
-                    }
-
-                    CheckBox {
-                        text: qsTr("Error")
-                        checked: true
-                        background: Rectangle {
-                            color: "transparent"  // 修复：添加引号
-                        }
-                        indicator: Rectangle {
-                            implicitWidth: 20
-                            implicitHeight: 20
-                            border.width: 2
-                            border.color: "#464647"
-                            color: parent.checked ? "#3C3C3C" : "transparent"  // 修复：使用parent.checked
-                        }
-                        contentItem: Text {
-                            text: qsTr("Error")
-                            color: "#FFFFFF"
-                            verticalAlignment: Text.AlignVCenter
-                        }
-                    }
+                
+                onLogLevelChanged: {
+                    console.log("日志级别改变 - Debug:", logModule.debugChecked, "Info:", logModule.infoChecked, 
+                               "Warning:", logModule.warningChecked, "Error:", logModule.errorChecked)
                 }
-
-                // 日志显示区域
-                Rectangle {
-                    Layout.fillHeight: true
-                    Layout.fillWidth: true
-                    color: "#1E1E1E"
-                    border.width: 1
-                    border.color: "#464647"
-                    // 日志内容
-                    Text {
-                        anchors.centerIn: parent
-                        text: qsTr("日志显示区域")
-                        color: "#CCCCCC"
-                    }
+                onClearLogRequested: {
+                    logModule.logText = ""
+                    console.log("清空日志")
                 }
             }
         }

@@ -17,6 +17,11 @@ qt_add_qml_module(appFOC_CTRL
     VERSION 1.0
     QML_FILES
         Main.qml
+        qml/SerialCommunicationModule.qml
+        qml/FOCChartModule.qml
+        qml/MotorModeControlModule.qml
+        qml/MotorDataReadWriteModule.qml
+        qml/LogModule.qml
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
