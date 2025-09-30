@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls // 添加Controls模块导入
 import QtQuick.Layouts
+import QtCharts
 
 ApplicationWindow {
     id: mainWindow
@@ -232,84 +233,131 @@ ApplicationWindow {
 
                 ColumnLayout {
                     anchors.fill: parent
-                    spacing: 5
+                    spacing: 0  // 移除间距以实现精确比例分割
                     anchors.margins: 10
 
-                    Text {
-                        text: qsTr("FOC数据曲线显示与控制")
-                        color: "#FFFFFF"
-                        font.pixelSize: 18
-                        font.bold: true
-                    }
-
+                    // 上部分 - 曲线图显示区域 (80%)
                     Rectangle {
-                        Layout.fillHeight: true
+                        id: chartArea
+                        Layout.preferredHeight: parent.height * 0.8
                         Layout.fillWidth: true
                         color: "#1E1E1E"
                         border.width: 1
                         border.color: "#464647"
-                        // 曲线显示区域
-                        Text {
-                            anchors.centerIn: parent
-                            text: qsTr("曲线显示区域")
-                            color: "#CCCCCC"
+                        
+                        ColumnLayout {
+                            anchors.fill: parent
+                            spacing: 5
+                            anchors.margins: 10
+
+                            Text {
+                                text: qsTr("FOC数据曲线显示")
+                                color: "#FFFFFF"
+                                font.pixelSize: 16
+                                font.bold: true
+                            }
+
+                            // 曲线显示区域
+                            Rectangle {
+                                Layout.fillHeight: true
+                                Layout.fillWidth: true
+                                color: "#000000"
+                                border.width: 1
+                                border.color: "#464647"
+                                // 曲线显示区域
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: qsTr("曲线图将在这里显示")
+                                    color: "#CCCCCC"
+                                }
+                            }
                         }
                     }
 
-                    // 曲线控制区域
-                    RowLayout {
+                    // 中间分隔条
+                    Item {
+                        Layout.preferredHeight: 5
                         Layout.fillWidth: true
-                        spacing: 10
+                    }
 
-                        Button {
-                            text: qsTr("添加变量")
-                            background: Rectangle {
-                                color: "#3C3C3C"
-                            }
-                            contentItem: Text {
-                                text: qsTr("添加变量")
-                                color: "#FFFFFF"
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                        }
+                    // 下部分 - 变量添加和控制区域 (20%)
+                    Rectangle {
+                        id: variableControlArea
+                        Layout.preferredHeight: parent.height * 0.2
+                        Layout.fillWidth: true
+                        color: "#2D2D30"
+                        border.width: 1
+                        border.color: "#464647"
+                        radius: 3
 
-                        Button {
-                            text: qsTr("导出数据")
-                            background: Rectangle {
-                                color: "#3C3C3C"
-                            }
-                            contentItem: Text {
-                                text: qsTr("导出数据")
-                                color: "#FFFFFF"
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                        }
+                        ColumnLayout {
+                            anchors.fill: parent
+                            spacing: 5
+                            anchors.margins: 10
 
-                        Button {
-                            text: qsTr("清空曲线")
-                            background: Rectangle {
-                                color: "#3C3C3C"
-                            }
-                            contentItem: Text {
-                                text: qsTr("清空曲线")
+                            Text {
+                                text: qsTr("变量添加与控制")
                                 color: "#FFFFFF"
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
+                                font.pixelSize: 14
+                                font.bold: true
                             }
-                        }
 
-                        Button {
-                            text: qsTr("暂停显示")
-                            background: Rectangle {
-                                color: "#3C3C3C"
-                            }
-                            contentItem: Text {
-                                text: qsTr("暂停显示")
-                                color: "#FFFFFF"
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
+                            // 变量添加和控制按钮区域
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 10
+
+                                Button {
+                                    text: qsTr("添加变量")
+                                    background: Rectangle {
+                                        color: "#3C3C3C"
+                                    }
+                                    contentItem: Text {
+                                        text: qsTr("添加变量")
+                                        color: "#FFFFFF"
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+                                }
+
+                                Button {
+                                    text: qsTr("导出数据")
+                                    background: Rectangle {
+                                        color: "#3C3C3C"
+                                    }
+                                    contentItem: Text {
+                                        text: qsTr("导出数据")
+                                        color: "#FFFFFF"
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+                                }
+
+                                Button {
+                                    text: qsTr("清空曲线")
+                                    background: Rectangle {
+                                        color: "#3C3C3C"
+                                    }
+                                    contentItem: Text {
+                                        text: qsTr("清空曲线")
+                                        color: "#FFFFFF"
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+                                }
+
+                                Button {
+                                    text: qsTr("暂停显示")
+                                    background: Rectangle {
+                                        color: "#3C3C3C"
+                                    }
+                                    contentItem: Text {
+                                        text: qsTr("暂停显示")
+                                        color: "#FFFFFF"
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+                                }
                             }
                         }
                     }
