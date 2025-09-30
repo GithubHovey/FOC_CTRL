@@ -64,16 +64,16 @@ ApplicationWindow {
             }
         }
 
-        // 主内容区域 - 使用Row布局
+        // 主内容区域 - 使用Row布局，支持响应式缩放
         Row {
             width: parent.width
             height: parent.height - topBar.height
             spacing: 0
 
-            // 左侧栏 - 固定宽度
+            // 左侧栏 - 串口通信模块，30%宽度
             Rectangle {
                 id: leftBar
-                width: 200
+                width: parent.width * 0.30  // 30%宽度，响应式
                 height: parent.height
                 color: "#2D2D30"
                 border.width: 1
@@ -221,10 +221,10 @@ ApplicationWindow {
                 }
             }
 
-            // 中央栏 - 填充剩余空间
+            // 中央栏 - 图表显示区域，55%宽度
             Rectangle {
                 id: centerBar
-                width: parent.width - leftBar.width - rightBar.width
+                width: parent.width * 0.55  // 55%宽度，响应式
                 height: parent.height
                 color: "#2D2D30"
                 border.width: 1
@@ -316,10 +316,10 @@ ApplicationWindow {
                 }
             }
 
-            // 右侧栏 - 固定宽度
+            // 右侧栏 - 15%宽度
             Rectangle {
                 id: rightBar
-                width: 200
+                width: parent.width * 0.15  // 15%宽度，响应式
                 height: parent.height
                 color: "#2D2D30"
                 border.width: 1
@@ -333,7 +333,7 @@ ApplicationWindow {
                     // 电机模式控制模块
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: parent.height * 0.5
+                        Layout.preferredHeight: parent.height * 0.33  // 占三分之一
                         color: "#2D2D30"
                         border.width: 1
                         border.color: "#464647"
@@ -442,7 +442,7 @@ ApplicationWindow {
                     // 电机命令读写模块
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.fillHeight: true
+                        Layout.preferredHeight: parent.height * 0.33  // 占三分之一
                         color: "#2D2D30"
                         border.width: 1
                         border.color: "#464647"
@@ -554,6 +554,18 @@ ApplicationWindow {
                                 Layout.fillWidth: true
                             }
                         }
+                    }
+
+                    // 预留区域 - 占三分之一
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true  // 填充剩余空间
+                        color: "#2D2D30"
+                        border.width: 1
+                        border.color: "#464647"
+                        radius: 5
+
+                        // 空白区域，不添加任何内容
                     }
                 }
             }
