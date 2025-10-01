@@ -44,7 +44,7 @@ Rectangle {
                 }
                 contentItem: Text {
                     text: controlModeComboBox.displayText
-                    color: "#FFFFFF"
+                    color: '#e7d8d8'
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                     elide: Text.ElideRight

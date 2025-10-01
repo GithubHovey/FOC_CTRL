@@ -87,14 +87,6 @@ ApplicationWindow {
                     id: serialModule
                     anchors.fill: parent
                     anchors.margins: 10
-                    
-                    onConnectClicked: {
-                        console.log("串口连接状态:", serialModule.isConnected)
-                        console.log("串口:", serialModule.comPort, "波特率:", serialModule.baudRate)
-                    }
-                    onSendDataRequested: function(data) {
-                        console.log("发送数据:", data)
-                    }
                 }
             }
 
