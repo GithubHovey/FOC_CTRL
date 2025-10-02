@@ -216,4 +216,19 @@ ApplicationWindow {
 
         standardButtons: Dialog.Close
     }
+    
+    // 组件完成时初始化信号连接
+    Component.onCompleted: {
+        // 连接校准状态信号到UI
+        CommandControlManager.calibrationStatusChanged.connect(function(status, color) {
+            commandControl.calibrationStatus = status
+            commandControl.calibrationStatusColor = color
+            // 更新逻辑：当状态包含"成功"、"失败"或"超时"时重置进度状态
+            if (status.includes("成功") || status.includes("失败") || status.includes("超时")) {
+                commandControl.calibrationInProgress = false
+            }
+        })
+        
+        console.log("主界面初始化完成，信号连接已建立")
+    }
 }

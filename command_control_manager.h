@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QByteArray>
+#include <QTimer>
 #include "DOC/motor_protocol.h"
 
 class SerialCommunicationManager;
@@ -70,6 +71,19 @@ signals:
      */
     void errorOccurred(const QString &error);
 
+    /**
+     * @brief 校准状态更新信号
+     */
+    void calibrationStatusChanged(const QString &status, const QString &color);
+
+public slots:
+    /**
+     * @brief 处理电机校准应答
+     * @param status 应答状态
+     * @param state 电机状态
+     */
+    void onCmdMotorCalibrateReceived(uint8_t status, uint8_t state);
+
 private:
     // 构造函数私有化（单例模式）
     explicit CommandControlManager(QObject *parent = nullptr);
@@ -80,6 +94,16 @@ private:
     // 删除拷贝构造函数和赋值运算符
     CommandControlManager(const CommandControlManager&) = delete;
     CommandControlManager& operator=(const CommandControlManager&) = delete;
+
+    // 超时机制相关
+    QTimer* m_calibrationTimeoutTimer;  //!< 校准超时定时器
+    bool m_calibrationInProgress;       //!< 校准是否正在进行中
+
+private slots:
+    /**
+     * @brief 校准超时处理槽函数
+     */
+    void onCalibrationTimeout();
 
     /**
      * @brief 发送命令到串口

@@ -11,6 +11,11 @@ Rectangle {
 
     property alias calibrationEnabled: calibrationButton.enabled
     
+    // 校准状态属性
+    property string calibrationStatus: ""
+    property bool calibrationInProgress: false
+    property string calibrationStatusColor: "#FFFFFF"
+    
     // 信号定义
     signal calibrationRequested()
     
@@ -40,15 +45,17 @@ Rectangle {
         // 一键校准按钮
         Button {
             id: calibrationButton
-            text: qsTr("一键校准")
+            text: calibrationInProgress ? qsTr("校准中...") : qsTr("一键校准")
             Layout.fillWidth: true
             Layout.preferredHeight: 35
+            enabled: !calibrationInProgress
             
             background: Rectangle {
                 color: calibrationButton.pressed ? "#1066CC" : (calibrationButton.hovered ? "#1177DD" : "#0E639C")
                 radius: 3
                 border.width: 1
                 border.color: "#464647"
+                opacity: calibrationButton.enabled ? 1.0 : 0.6
             }
             
             contentItem: Text {
@@ -61,14 +68,37 @@ Rectangle {
             
             onClicked: {
                 console.log("一键校准按钮被点击")
+                calibrationInProgress = true
+                calibrationStatus = "校准开始..."
+                calibrationStatusColor = "#FFA500"
                 var result = CommandControlManager.performCalibration()
                 console.log("校准结果:", result)
-                if (result) {
-                    console.log("校准命令发送成功")
-                } else {
-                    console.log("校准命令发送失败")
+                if (!result) {
+                    calibrationInProgress = false
+                    calibrationStatus = "校准命令发送失败"
+                    calibrationStatusColor = "#FF0000"
                 }
                 calibrationRequested()
+            }
+        }
+        
+        // 校准状态显示
+        Rectangle {
+            id: calibrationStatusRect
+            Layout.fillWidth: true
+            Layout.preferredHeight: 25
+            color: "#1E1E1E"
+            radius: 3
+            border.width: 1
+            border.color: "#464647"
+            visible: calibrationStatus !== ""
+            
+            Text {
+                anchors.centerIn: parent
+                text: calibrationStatus
+                color: calibrationStatusColor
+                font.pixelSize: 11
+                font.bold: true
             }
         }
         

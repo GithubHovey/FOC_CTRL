@@ -13,8 +13,21 @@ CommandControlManager* CommandControlManager::getInstance()
 }
 
 CommandControlManager::CommandControlManager(QObject *parent)
-    : QObject(parent)
+    : QObject(parent),
+      m_calibrationTimeoutTimer(nullptr),
+      m_calibrationInProgress(false)
 {
+    // 连接串口管理器的校准应答信号到本对象的槽函数
+    auto* serialManager = SerialCommunicationManager::getInstance();
+    connect(serialManager, &SerialCommunicationManager::cmdMotorCalibrateReceived,
+            this, &CommandControlManager::onCmdMotorCalibrateReceived);
+    
+    // 初始化超时定时器
+    m_calibrationTimeoutTimer = new QTimer(this);
+    m_calibrationTimeoutTimer->setSingleShot(true);  // 单次触发
+    m_calibrationTimeoutTimer->setInterval(2000);    // 2秒超时
+    connect(m_calibrationTimeoutTimer, &QTimer::timeout,
+            this, &CommandControlManager::onCalibrationTimeout);
 }
 
 CommandControlManager::~CommandControlManager()
@@ -27,19 +40,38 @@ bool CommandControlManager::performCalibration()
     
     if (!serialManager->isConnected()) {
         emit errorOccurred("串口未连接");
+        emit calibrationStatusChanged("串口未连接", "#FF0000");
         return false;
     }
+
+    // 如果校准已在进行中，直接返回
+    if (m_calibrationInProgress) {
+        qWarning() << "校准已在进行中，忽略重复请求";
+        return false;
+    }
+
+    // 设置校准状态为进行中
+    m_calibrationInProgress = true;
+
+    // 发送状态更新到QML
+    emit calibrationStatusChanged("正在发送校准命令...", "#FFA500");
 
     QByteArray data = createCalibrationData();
     bool success = serialManager->pushCmd(data, CMD_MOTOR_CALIBRATE);
     
     if (success) {
         qDebug() << "校准命令发送成功";
-        emit commandCompleted("calibration", true);
+        emit calibrationStatusChanged("校准命令已发送，等待应答...", "#FFA500");
+        // 启动2秒超时定时器
+        m_calibrationTimeoutTimer->start();
+        // 注意：此时不立即发送commandCompleted，等待应答或超时后再发送
     } else {
         qWarning() << "校准命令发送失败";
         emit errorOccurred("校准命令发送失败");
+        emit calibrationStatusChanged("校准命令发送失败", "#FF0000");
         emit commandCompleted("calibration", false);
+        // 重置校准状态
+        m_calibrationInProgress = false;
     }
 
     return success;
@@ -109,6 +141,24 @@ QByteArray CommandControlManager::createCalibrationData()
     memset(data.data(), 0, 10);
     
     return data;
+}
+
+void CommandControlManager::onCalibrationTimeout()
+{
+    qWarning() << "校准超时：2秒内未收到应答";
+    
+    // 只有在校准进行中才处理超时
+    if (!m_calibrationInProgress) {
+        return;
+    }
+    
+    // 重置校准状态
+    m_calibrationInProgress = false;
+    
+    // 发送超时状态更新到QML
+    emit calibrationStatusChanged("校准超时：2秒内未收到应答", "#FF0000");
+    emit errorOccurred("校准超时：2秒内未收到应答");
+    emit commandCompleted("calibration", false);
 }
 
 QByteArray CommandControlManager::createStartData()
@@ -219,4 +269,53 @@ QByteArray CommandControlManager::createResetData()
     data[9] = 0x00;
     
     return data;
+}
+
+void CommandControlManager::onCmdMotorCalibrateReceived(uint8_t status, uint8_t state)
+{
+    qDebug() << "收到校准应答 - 状态:" << status << "电机状态:" << state;
+    
+    // 只有在校准进行中才处理应答
+    if (!m_calibrationInProgress) {
+        qWarning() << "收到未预期的校准应答，忽略";
+        return;
+    }
+    
+    // 停止超时定时器
+    if (m_calibrationTimeoutTimer->isActive()) {
+        m_calibrationTimeoutTimer->stop();
+    }
+    
+    // 重置校准状态
+    m_calibrationInProgress = false;
+    
+    // 根据应答状态处理
+    switch (status) {
+        case 0x00: // RESPONSE_OK
+            qDebug() << "校准成功";
+            emit calibrationStatusChanged("校准成功！电机状态: " + QString::number(state), "#00FF00");
+            emit commandCompleted("calibration", true);
+            break;
+            
+        case 0x01: // RESPONSE_ERROR
+            qWarning() << "校准失败：通用错误";
+            emit calibrationStatusChanged("校准失败：通用错误", "#FF0000");
+            emit errorOccurred("校准失败：通用错误");
+            emit commandCompleted("calibration", false);
+            break;
+            
+        case 0x06: // RESPONSE_CALIBRATE_FAILED
+            qWarning() << "校准失败：校准过程错误";
+            emit calibrationStatusChanged("校准失败：校准过程错误", "#FF0000");
+            emit errorOccurred("校准失败：校准过程错误");
+            emit commandCompleted("calibration", false);
+            break;
+            
+        default:
+            qWarning() << "校准失败：未知错误码" << status;
+            emit calibrationStatusChanged(QString("校准失败：未知错误码 %1").arg(status), "#FF0000");
+            emit errorOccurred(QString("校准失败：未知错误码 %1").arg(status));
+            emit commandCompleted("calibration", false);
+            break;
+    }
 }
