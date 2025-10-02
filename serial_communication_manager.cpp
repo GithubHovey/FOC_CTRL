@@ -1,4 +1,5 @@
 #include "serial_communication_manager.h"
+#include <QtConcurrent>
 
 SerialCommunicationManager::SerialCommunicationManager(QObject *parent)
     : QObject(parent)
@@ -11,6 +12,7 @@ SerialCommunicationManager::SerialCommunicationManager(QObject *parent)
     , m_bytesReceived(0)
     , m_bytesSent(0)
     , m_updateTimer(new QTimer(this))
+    , m_stopCmdThread(false)
 {
     // 连接串口信号
     connect(m_serialPort, &QSerialPort::readyRead, this, &SerialCommunicationManager::onReadyRead);
@@ -24,12 +26,33 @@ SerialCommunicationManager::SerialCommunicationManager(QObject *parent)
     });
     m_updateTimer->start(100); // 100ms更新一次
     
+    // 启动命令处理线程
+    QThreadPool::globalInstance()->start([this]() {
+        this->processCmdQueue();
+    });
+    
+    // 初始化协议接收环形缓冲区
+    m_rxRingbuf = ringbuf_alloc(1024); // 创建1KB的接收缓冲区
+    
     // 初始化可用端口列表
     scanAvailablePorts();
 }
 
 SerialCommunicationManager::~SerialCommunicationManager()
 {
+    // 停止命令处理线程
+    m_stopCmdThread = true;
+    m_cmdCondition.wakeAll(); // 唤醒等待的线程
+    
+    // 等待一段时间让线程安全退出
+    QThread::msleep(100);
+    
+    // 释放协议接收环形缓冲区
+    if (m_rxRingbuf) {
+        ringbuf_free(m_rxRingbuf);
+        m_rxRingbuf = nullptr;
+    }
+    
     if (m_serialPort->isOpen()) {
         m_serialPort->close();
     }
@@ -54,6 +77,9 @@ bool SerialCommunicationManager::connectPort(const QString &portName, int baudRa
         emit connectionStateChanged();
         emit connectionStatusChanged();
         
+        // 唤醒命令处理线程（串口已连接）
+        m_cmdCondition.wakeAll();
+        
         // 不再显示连接成功消息到数据区域
         // appendToDataList(QString("[系统] 串口连接成功: %1 @ %2").arg(portName).arg(baudRate), false);
         return true;
@@ -76,6 +102,9 @@ void SerialCommunicationManager::disconnectPort()
         m_connectionStatus = "未连接";
         emit connectionStateChanged();
         emit connectionStatusChanged();
+        
+        // 唤醒命令处理线程（让线程检查连接状态并等待）
+        m_cmdCondition.wakeAll();
         
         // 不再显示断开连接消息到数据区域
         // appendToDataList(QString("[系统] 串口已断开: %1").arg(portName), false);
@@ -141,6 +170,13 @@ void SerialCommunicationManager::onReadyRead()
     if (!data.isEmpty()) {
         // 更新接收字节计数
         m_bytesReceived += data.size();
+        
+        // 将接收到的数据写入环形缓冲区
+        if (m_rxRingbuf) {
+            ringbuf_push(m_rxRingbuf, reinterpret_cast<const uint8_t*>(data.constData()), data.size());
+            // 调用协议解析函数
+            parseProtocol();
+        }
         
         // 将原始二进制数据格式化为可显示的字符串
         // formatData()会处理非打印字符、根据m_hexDisplay设置进行HEX转换等
@@ -302,4 +338,211 @@ void SerialCommunicationManager::resetByteCounters()
     m_bytesSent = 0;
     emit bytesReceivedChanged();
     emit bytesSentChanged();
+}
+
+void SerialCommunicationManager::processCmdQueue()
+{
+    qDebug() << "命令处理线程已启动";
+    
+    while (!m_stopCmdThread) {
+        QByteArray cmd;
+        
+        // 从队列中获取命令
+        {
+            QMutexLocker locker(&m_cmdMutex);
+            
+            // 等待条件：有命令可用且串口已连接，或者需要停止线程
+            while (!m_stopCmdThread && (m_cmdList.isEmpty() || !m_isConnected)) {
+                qDebug() << "命令处理线程等待中... 队列大小:" << m_cmdList.size() 
+                         << "连接状态:" << m_isConnected;
+                m_cmdCondition.wait(&m_cmdMutex);
+            }
+            
+            // 检查是否需要停止线程
+            if (m_stopCmdThread) {
+                break;
+            }
+            
+            // 再次检查是否有命令可用（可能被其他线程消费）
+            if (m_cmdList.isEmpty()) {
+                continue;
+            }
+            
+            cmd = m_cmdList.takeFirst();
+        }
+        
+        // 只有在串口连接时才发送命令
+        if (m_isConnected && !cmd.isEmpty()) {
+            qint64 bytesWritten = m_serialPort->write(cmd);
+            if (bytesWritten > 0) {
+                // 更新发送字节计数
+                m_bytesSent += bytesWritten;
+                emit bytesSentChanged();
+                
+                QString formattedData = formatData(cmd, true);
+                QString timestamp = QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
+                
+                // 根据显示设置决定是否显示
+                if (m_showTx) {
+                    appendToDataList(formattedData, true);
+                }
+                
+                emit dataSent(formattedData, timestamp);
+                qDebug() << "命令已发送，长度：" << bytesWritten << "字节";
+            } else {
+                QString error = "发送命令失败: " + m_serialPort->errorString();
+                emit errorOccurred(error);
+                qDebug() << error;
+            }
+        } else {
+            qDebug() << "串口未连接，命令发送失败";
+        }
+        
+        // 发送间隔，避免过快发送
+        QThread::msleep(10);
+    }
+    
+    qDebug() << "命令处理线程已停止";
+}
+
+bool SerialCommunicationManager::pushCmd(const QByteArray &cmd)
+{
+    // 验证命令长度是否为14字节
+    if (cmd.size() != 14) {
+        qDebug() << "命令长度错误：期望14字节，实际" << cmd.size() << "字节";
+        return false;
+    }
+    
+    // 将命令添加到队列
+    {
+        QMutexLocker locker(&m_cmdMutex);
+        m_cmdList.append(cmd);
+        qDebug() << "命令已添加到队列，当前队列长度：" << m_cmdList.size();
+    }
+    
+    // 唤醒命令处理线程
+    m_cmdCondition.wakeOne();
+    
+    return true;
+}
+
+void SerialCommunicationManager::parseProtocol()
+{
+    // 协议解析方法
+    // 创建一个临时ringbuf指针，指向接收缓冲区
+    ringbuf_t *cmd_rb = m_rxRingbuf;
+    
+    uint8_t cmd_len = 0;
+    
+    // 查找协议包头
+    while(1) {
+        uint16_t rb_len = ringbuf_len(cmd_rb);
+        
+        if(rb_len < PROTOCOL_LENGTH) {
+            return; // 数据长度不足1帧
+        }
+        
+        if(ringbuf_get_at(cmd_rb, 0) == PROTOCOL_HEADER) {
+            cmd_len = PROTOCOL_LENGTH; // 使用固定包长
+            
+            if(rb_len < cmd_len) {
+                return; // 可能发生拆包，数据长度不足一帧
+            }
+            
+            if (ringbuf_get_at(cmd_rb, cmd_len - 1) == PROTOCOL_FOOTER) {
+                // 计算校验和（从包头到数据区结束，不包括包尾和校验字节）
+                // ringbuf_checksum返回16位累加和，取低8位作为校验和
+                uint16_t calc_checksum_full = ringbuf_checksum(cmd_rb, 0, cmd_len - 3);
+                uint8_t calc_checksum = (uint8_t)(calc_checksum_full & 0xFF);
+                uint8_t recv_checksum = ringbuf_get_at(cmd_rb, cmd_len - 2);
+                
+                if (calc_checksum == recv_checksum) {
+                    break; // 校验通过，跳出循环
+                } else {
+                    ringbuf_remove(cmd_rb, 1); // 校验失败，丢弃一个字节
+                    continue;
+                }
+            } else {
+                ringbuf_remove(cmd_rb, 1); // 包尾不匹配，丢弃一个字节
+                continue;
+            }
+        } else {
+            ringbuf_remove(cmd_rb, 1); // 丢弃一个字节，重新开始解析
+            continue;
+        }
+    }
+    
+    // 提取完整的数据包到临时缓冲区
+    for (int i = 0; i < PROTOCOL_LENGTH; i++) {
+        m_parseBuffer[i] = ringbuf_get_at(cmd_rb, i);
+    }
+    
+    // 解析命令字并分发到不同模块
+    uint8_t cmd = m_parseBuffer[1]; // 命令字在第2个字节
+    
+    switch (cmd) {
+        case CMD_READ_DATA:
+            {
+                uint8_t dataId = m_parseBuffer[2]; // 数据ID
+                uint32_t dataValue = 0;
+                // 从第3个字节开始提取4字节数据值（小端模式）
+                dataValue |= m_parseBuffer[3];
+                dataValue |= (m_parseBuffer[4] << 8);
+                dataValue |= (m_parseBuffer[5] << 16);
+                dataValue |= (m_parseBuffer[6] << 24);
+                emit cmdReadDataReceived(dataId, dataValue);
+            }
+            break;
+            
+        case CMD_WRITE_DATA:
+            {
+                uint8_t dataId = m_parseBuffer[2]; // 数据ID
+                uint32_t dataValue = 0;
+                // 从第3个字节开始提取4字节数据值（小端模式）
+                dataValue |= m_parseBuffer[3];
+                dataValue |= (m_parseBuffer[4] << 8);
+                dataValue |= (m_parseBuffer[5] << 16);
+                dataValue |= (m_parseBuffer[6] << 24);
+                emit cmdWriteDataReceived(dataId, dataValue);
+            }
+            break;
+            
+        case CMD_MOTOR_START:
+            {
+                uint8_t status = m_parseBuffer[2]; // 状态
+                uint8_t state = m_parseBuffer[3];  // 电机状态
+                emit cmdMotorStartReceived(status, state);
+            }
+            break;
+            
+        case CMD_MOTOR_STOP:
+            {
+                uint8_t status = m_parseBuffer[2]; // 状态
+                uint8_t state = m_parseBuffer[3];  // 电机状态
+                emit cmdMotorStopReceived(status, state);
+            }
+            break;
+            
+        case CMD_MOTOR_CALIBRATE:
+            {
+                uint8_t status = m_parseBuffer[2]; // 状态
+                uint8_t state = m_parseBuffer[3];  // 电机状态
+                emit cmdMotorCalibrateReceived(status, state);
+            }
+            break;
+            
+        case CMD_MODE_SET:
+            {
+                uint8_t mode = m_parseBuffer[2]; // 模式
+                emit cmdModeSetReceived(mode);
+            }
+            break;
+            
+        default:
+            qDebug() << "收到未知命令字:" << QString("0x%1").arg(cmd, 2, 16, QChar('0'));
+            break;
+    }
+    
+    // 移除已处理的数据包
+    ringbuf_remove(cmd_rb, PROTOCOL_LENGTH);
 }

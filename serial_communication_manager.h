@@ -8,6 +8,15 @@
 #include <QTimer>
 #include <QDateTime>
 #include <QDebug>
+#include <QThread>
+#include <QMutex>
+#include <QWaitCondition>
+
+// 包含电机协议头文件和环形缓冲区
+#include "ringbuf.h"
+extern "C" {
+#include "DOC/motor_protocol.h"
+}
 
 class SerialCommunicationManager : public QObject
 {
@@ -74,6 +83,7 @@ public slots:
     Q_INVOKABLE void clearData();
     Q_INVOKABLE void refreshPorts();
     Q_INVOKABLE void resetByteCounters();
+    Q_INVOKABLE bool pushCmd(const QByteArray &cmd); // 推送14字节命令到队列
 
 signals:
     // 属性变化通知
@@ -92,11 +102,21 @@ signals:
     void dataReceived(const QString &data, const QString &timestamp);
     void dataSent(const QString &data, const QString &timestamp);
     void errorOccurred(const QString &error);
+    
+    // 协议命令分发信号
+    void cmdReadDataReceived(uint8_t dataId, uint32_t dataValue);
+    void cmdWriteDataReceived(uint8_t dataId, uint32_t dataValue);
+    void cmdMotorStartReceived(uint8_t status, uint8_t state);
+    void cmdMotorStopReceived(uint8_t status, uint8_t state);
+    void cmdMotorCalibrateReceived(uint8_t status, uint8_t state);
+    void cmdModeSetReceived(uint8_t mode);
 
 private slots:
     void onReadyRead();
     void onErrorOccurred(QSerialPort::SerialPortError error);
     void updateAvailablePorts();
+    void processCmdQueue(); // 处理命令队列
+    void parseProtocol(); // 协议解包函数
 
 private:
     QSerialPort *m_serialPort;
@@ -123,6 +143,16 @@ private:
     };
     QList<DataItem> m_dataList;
     static const int MAX_LINES = 1000;
+    
+    // 命令队列 - 每条命令14字节
+    QList<QByteArray> m_cmdList;
+    QMutex m_cmdMutex; // 命令队列互斥锁
+    QWaitCondition m_cmdCondition; // 命令队列条件变量
+    bool m_stopCmdThread; // 停止命令线程标志
+    
+    // 协议接收缓冲区
+    ringbuf_t *m_rxRingbuf; // 接收环形缓冲区
+    uint8_t m_parseBuffer[PROTOCOL_LENGTH]; // 协议解析临时缓冲区
     
     // 内部方法
     void scanAvailablePorts();
