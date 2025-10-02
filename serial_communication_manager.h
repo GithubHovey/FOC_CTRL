@@ -22,6 +22,17 @@ class SerialCommunicationManager : public QObject
 {
     Q_OBJECT
     
+public:
+    // 获取单例实例
+    static SerialCommunicationManager* getInstance() {
+        static SerialCommunicationManager instance;
+        return &instance;
+    }
+    
+    // 删除拷贝构造函数和赋值运算符
+    SerialCommunicationManager(const SerialCommunicationManager&) = delete;
+    SerialCommunicationManager& operator=(const SerialCommunicationManager&) = delete;
+    
     // 暴露给QML的属性
     Q_PROPERTY(bool isConnected READ isConnected NOTIFY connectionStateChanged)
     Q_PROPERTY(QStringList availablePorts READ availablePorts NOTIFY availablePortsChanged)
@@ -35,7 +46,11 @@ class SerialCommunicationManager : public QObject
     Q_PROPERTY(qint64 bytesSent READ bytesSent NOTIFY bytesSentChanged)
 
 public:
+private:
+    // 构造函数私有化（单例模式）
     explicit SerialCommunicationManager(QObject *parent = nullptr);
+    
+public:
     ~SerialCommunicationManager();
 
     // Getter方法 - QML读取属性
@@ -83,7 +98,7 @@ public slots:
     Q_INVOKABLE void clearData();
     Q_INVOKABLE void refreshPorts();
     Q_INVOKABLE void resetByteCounters();
-    Q_INVOKABLE bool pushCmd(const QByteArray &cmd); // 推送14字节命令到队列
+    Q_INVOKABLE bool pushCmd(const QByteArray &data, motor_command_t cmd); // 推送命令到队列，自动添加包头包尾和校验和
 
 signals:
     // 属性变化通知

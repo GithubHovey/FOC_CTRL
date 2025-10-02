@@ -405,19 +405,45 @@ void SerialCommunicationManager::processCmdQueue()
     qDebug() << "命令处理线程已停止";
 }
 
-bool SerialCommunicationManager::pushCmd(const QByteArray &cmd)
+bool SerialCommunicationManager::pushCmd(const QByteArray &data, motor_command_t cmd)
 {
-    // 验证命令长度是否为14字节
-    if (cmd.size() != 14) {
-        qDebug() << "命令长度错误：期望14字节，实际" << cmd.size() << "字节";
+    // 验证数据长度是否为10字节
+    if (data.size() != 10) {
+        qDebug() << "数据长度错误：期望10字节，实际" << data.size() << "字节";
         return false;
     }
+    
+    // 构建完整的14字节命令包
+    QByteArray fullCmd;
+    fullCmd.resize(PROTOCOL_LENGTH);
+    
+    // 添加包头
+    fullCmd[0] = PROTOCOL_HEADER;
+    
+    // 添加命令字
+    fullCmd[1] = static_cast<uint8_t>(cmd);
+    
+    // 添加10字节数据
+    for (int i = 0; i < 10; i++) {
+        fullCmd[2 + i] = static_cast<uint8_t>(data[i]);
+    }
+    
+    // 计算校验和（从包头到数据区结束，不包括包尾和校验字节本身）
+    uint16_t checksum = 0;
+    for (int i = 0; i < 12; i++) { // 0-11字节（包头+命令字+10字节数据）
+        checksum += static_cast<uint8_t>(fullCmd[i]);
+    }
+    fullCmd[12] = static_cast<uint8_t>(checksum & 0xFF); // 取低8位
+    
+    // 添加包尾
+    fullCmd[13] = PROTOCOL_FOOTER;
     
     // 将命令添加到队列
     {
         QMutexLocker locker(&m_cmdMutex);
-        m_cmdList.append(cmd);
-        qDebug() << "命令已添加到队列，当前队列长度：" << m_cmdList.size();
+        m_cmdList.append(fullCmd);
+        qDebug() << "命令已添加到队列，当前队列长度：" << m_cmdList.size() 
+                 << "命令字: 0x" << QString::number(cmd, 16).toUpper();
     }
     
     // 唤醒命令处理线程

@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import SerialComm 1.0 // 导入串口通信模块
+import FOC_CTRL 1.0 // 导入FOC_CTRL模块
 
 Rectangle {
     id: serialCommunicationModule
@@ -18,26 +18,29 @@ Rectangle {
         return (bytes / (1024 * 1024)).toFixed(1) + " MB"
     }
 
-    // 创建串口通信管理器实例
-    SerialCommManager {
-        id: serialManager
+    // 使用FOC_CTRL模块中的SerialCommManager单例
+    property var serialManager: SerialCommManager
+
+    // 连接信号处理
+    Connections {
+        target: SerialCommManager
         
         // 处理连接状态变化
-        onConnectionStateChanged: {
-            connectButton.text = isConnected ? "断开" : "连接"
+        function onConnectionStateChanged() {
+            connectButton.text = SerialCommManager.isConnected ? "断开" : "连接"
         }
         
         // 处理错误
-        onErrorOccurred: {
+        function onErrorOccurred(error) {
             console.error("串口错误:", error)
         }
         
         // 添加availablePortsChanged信号处理
-        onAvailablePortsChanged: {
-            console.log("Available ports updated, new count:", availablePorts.length)
-            console.log("Available ports list:", availablePorts)
+        function onAvailablePortsChanged() {
+            console.log("Available ports updated, new count:", SerialCommManager.availablePorts.length)
+            console.log("Available ports list:", SerialCommManager.availablePorts)
             // 如果当前没有选中的端口，但有可用端口，则选中第一个
-            if (comPortComboBox.currentIndex === -1 && availablePorts.length > 0) {
+            if (comPortComboBox.currentIndex === -1 && SerialCommManager.availablePorts.length > 0) {
                 comPortComboBox.currentIndex = 0
                 console.log("Auto-selected first port:", comPortComboBox.currentText)
             }
@@ -46,16 +49,14 @@ Rectangle {
         // 组件完成时刷新端口列表
         Component.onCompleted: {
             console.log("SerialManager initialized, refreshing ports...")
-            refreshPorts()
+            SerialCommManager.refreshPorts()
         }
     }
-
-    // 定期刷新端口列表的定时器
 
 
     property alias comPort: comPortComboBox.currentText
     property alias baudRate: baudRateComboBox.currentText
-    property bool isConnected: serialManager ? serialManager.isConnected : false
+    property bool isConnected: SerialCommManager ? SerialCommManager.isConnected : false
 
     ColumnLayout {
         anchors.fill: parent
@@ -77,7 +78,7 @@ Rectangle {
 
             ComboBox {
                 id: comPortComboBox
-                model: serialManager ? serialManager.availablePortDetails : []
+                model: SerialCommManager ? SerialCommManager.availablePortDetails : []
                 currentIndex: model.length > 0 ? 0 : -1
                 Layout.fillWidth: true
                 Layout.maximumWidth: 350
@@ -109,7 +110,7 @@ Rectangle {
             Button {
                 text: qsTr("刷新端口")
                 onClicked: {
-                    if(serialManager) serialManager.refreshPorts();
+                    if(SerialCommManager) SerialCommManager.refreshPorts();
                 }
                 Layout.alignment: Qt.AlignRight
                 Layout.maximumWidth: 100
@@ -154,29 +155,29 @@ Rectangle {
             // 连接按钮
             Button {
                 id: connectButton
-                text: serialManager ? (serialManager.isConnected ? "断开" : "连接") : "连接"
+                text: SerialCommManager ? (SerialCommManager.isConnected ? "断开" : "连接") : "连接"
                 Layout.maximumWidth: 120
                 enabled: comPortComboBox.currentIndex >= 0
                 background: Rectangle {
-                    color: serialManager ? (serialManager.isConnected ? "#FF4444" : "#3C3C3C") : "#3C3C3C"
+                    color: SerialCommManager ? (SerialCommManager.isConnected ? "#FF4444" : "#3C3C3C") : "#3C3C3C"
                 }
                 contentItem: Text {
-                    text: serialManager ? (serialManager.isConnected ? "断开" : "连接") : "连接"
+                    text: SerialCommManager ? (SerialCommManager.isConnected ? "断开" : "连接") : "连接"
                     color: "#FFFFFF"
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
                 onClicked: {
-                    if (serialManager) {
-                        if (!serialManager.isConnected) {
+                    if (SerialCommManager) {
+                        if (!SerialCommManager.isConnected) {
                             // 提取端口号（详细信息的前缀部分）
                         var portName = comPortComboBox.currentText.split(" - ")[0];
                         console.log("Connecting to port:", portName, "with baud rate:", baudRateComboBox.currentText)
-                            var success = serialManager.connectPort(portName, parseInt(baudRateComboBox.currentText))
+                            var success = SerialCommManager.connectPort(portName, parseInt(baudRateComboBox.currentText))
                             console.log("Connection attempt result:", success)
                         } else {
                             console.log("Disconnecting from port")
-                            serialManager.disconnectPort()
+                            SerialCommManager.disconnectPort()
                         }
                     }
                 }
@@ -187,8 +188,8 @@ Rectangle {
 
         // 显示连接状态
         Text {
-            text: serialManager ? serialManager.connectionStatus : "未连接"
-            color: serialManager ? (serialManager.isConnected ? "#00FF00" : "#FF4444") : "#FF4444"
+            text: SerialCommManager ? SerialCommManager.connectionStatus : "未连接"
+            color: SerialCommManager ? (SerialCommManager.isConnected ? "#00FF00" : "#FF4444") : "#FF4444"
             font.pixelSize: 12
         }
 
@@ -205,7 +206,7 @@ Rectangle {
                 id: dataDisplayArea
                 anchors.fill: parent
                 anchors.margins: 5
-                text: serialManager ? serialManager.displayData : ""
+                text: SerialCommManager ? SerialCommManager.displayData : ""
                 readOnly: true
                 font.family: "Consolas, Monaco, monospace"
                 font.pixelSize: 12

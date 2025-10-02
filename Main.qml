@@ -13,7 +13,7 @@ ApplicationWindow {
     height: 720
     title: qsTr("FOC控制器")
     color: "#1E1E1E"
-
+    
     // 主布局容器 - 使用Column布局
     Column {
         anchors.fill: parent
@@ -177,8 +177,7 @@ ApplicationWindow {
                         Layout.fillHeight: true  // 填充剩余空间
                         
                         onCalibrationRequested: {
-                            console.log("校准命令已发送")
-                            // 这里可以添加实际的校准逻辑
+                            console.log("校准请求信号已发出")
                         }
                     }
                 }
