@@ -66,7 +66,7 @@ public slots:
     // QML可调用的方法
     Q_INVOKABLE bool connectPort(const QString &portName, int baudRate);
     Q_INVOKABLE void disconnectPort();
-    Q_INVOKABLE void sendData(const QString &data);
+    Q_INVOKABLE bool sendData(const QString &data);
     Q_INVOKABLE void clearData();
     Q_INVOKABLE void refreshPorts();
 

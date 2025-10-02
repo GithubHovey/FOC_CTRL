@@ -72,11 +72,11 @@ void SerialCommunicationManager::disconnectPort()
     }
 }
 
-void SerialCommunicationManager::sendData(const QString &data)
+bool SerialCommunicationManager::sendData(const QString &data)
 {
     if (!m_isConnected) {
         emit errorOccurred("串口未连接");
-        return;
+        return false;
     }
     
     QByteArray sendData = parseInputString(data);
@@ -84,13 +84,21 @@ void SerialCommunicationManager::sendData(const QString &data)
     
     if (bytesWritten > 0) {
         QString formattedData = formatData(sendData, true);
-        appendToDataList(formattedData, true);
+        
+        // *** 优化：根据显示设置决定是否将数据添加到缓冲区 ***
+        // 只有当用户选择显示发送数据时，才将数据添加到内部缓冲区
+        // 这样可以避免不必要的数据搬运，提高性能
+        if (m_showTx) {
+            appendToDataList(formattedData, true);
+        }
         
         QString timestamp = QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
         emit dataSent(formattedData, timestamp);
+        return true;
     } else {
         QString error = "发送数据失败: " + m_serialPort->errorString();
         emit errorOccurred(error);
+        return false;
     }
 }
 
@@ -108,12 +116,30 @@ void SerialCommunicationManager::refreshPorts()
 
 void SerialCommunicationManager::onReadyRead()
 {
+    // 从串口读取所有可用数据
+    // 注意：readAll()会一次性读取缓冲区中的所有数据，可能导致多个数据包被合并
     QByteArray data = m_serialPort->readAll();
+    
+    // 防御性编程：确保确实读取到了数据
     if (!data.isEmpty()) {
+        // 将原始二进制数据格式化为可显示的字符串
+        // formatData()会处理非打印字符、根据m_hexDisplay设置进行HEX转换等
         QString formattedData = formatData(data, false);
-        appendToDataList(formattedData, false);
         
+        // *** 优化：根据显示设置决定是否将数据添加到缓冲区 ***
+        // 只有当用户选择显示接收数据时，才将数据添加到内部缓冲区
+        // 这样可以避免不必要的数据搬运，提高性能
+        if (m_showRx) {
+            // false表示这是接收的数据（而非发送的数据）
+            appendToDataList(formattedData, false);
+        }
+        
+        // 生成精确到毫秒的时间戳，用于日志记录
         QString timestamp = QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
+        
+        // 发射信号通知其他模块有新数据到达
+        // 注意：目前这个信号没有连接到任何消费者，是预留接口
+        // 其他模块（如FOC曲线打印、数据解析等）可以通过连接此信号来获取数据
         emit dataReceived(formattedData, timestamp);
     }
 }
@@ -215,9 +241,9 @@ void SerialCommunicationManager::appendToDataList(const QString &data, bool isTx
     
     m_dataList.append(item);
     
-    // 限制数据量
+    // 限制数据量，防止缓冲区无限增长
     if (m_dataList.size() > MAX_LINES) {
-        m_dataList.removeFirst();
+        m_dataList.removeFirst();  // 移除最老的数据
     }
     
     updateDisplayData();
@@ -227,10 +253,8 @@ void SerialCommunicationManager::updateDisplayData()
 {
     QString display;
     for (const DataItem &item : m_dataList) {
-        // 根据显示设置过滤数据
-        if ((item.isTx && !m_showTx) || (!item.isTx && !m_showRx)) {
-            continue;
-        }
+        // *** 修改：移除过滤逻辑，因为数据添加阶段已经过滤 ***
+        // 数据已经在添加阶段根据显示设置进行了过滤，这里直接显示即可
         
         QString prefix = item.isTx ? "[发送] " : "[接收] ";
         QString line = QString("%1 %2: %3\n")
