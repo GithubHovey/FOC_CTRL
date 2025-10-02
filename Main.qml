@@ -170,16 +170,16 @@ ApplicationWindow {
                         }
                     }
 
-                    // 预留区域 - 占三分之一
-                    Rectangle {
+                    // 命令控制模块 - 占三分之一
+                    CommandControlModule {
+                        id: commandControl
                         Layout.fillWidth: true
                         Layout.fillHeight: true  // 填充剩余空间
-                        color: "#2D2D30"
-                        border.width: 1
-                        border.color: "#464647"
-                        radius: 5
-
-                        // 空白区域，不添加任何内容
+                        
+                        onCalibrationRequested: {
+                            console.log("校准命令已发送")
+                            // 这里可以添加实际的校准逻辑
+                        }
                     }
                 }
             }

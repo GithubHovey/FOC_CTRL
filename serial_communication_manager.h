@@ -22,6 +22,8 @@ class SerialCommunicationManager : public QObject
     Q_PROPERTY(bool showTx READ showTx WRITE setShowTx NOTIFY showTxChanged)
     Q_PROPERTY(bool showRx READ showRx WRITE setShowRx NOTIFY showRxChanged)
     Q_PROPERTY(bool hexDisplay READ hexDisplay WRITE setHexDisplay NOTIFY hexDisplayChanged)
+    Q_PROPERTY(qint64 bytesReceived READ bytesReceived NOTIFY bytesReceivedChanged)
+    Q_PROPERTY(qint64 bytesSent READ bytesSent NOTIFY bytesSentChanged)
 
 public:
     explicit SerialCommunicationManager(QObject *parent = nullptr);
@@ -36,6 +38,8 @@ public:
     bool showTx() const { return m_showTx; }
     bool showRx() const { return m_showRx; }
     bool hexDisplay() const { return m_hexDisplay; }
+    qint64 bytesReceived() const { return m_bytesReceived; }
+    qint64 bytesSent() const { return m_bytesSent; }
 
 public slots:
     // Setter方法 - QML设置属性
@@ -69,6 +73,7 @@ public slots:
     Q_INVOKABLE bool sendData(const QString &data);
     Q_INVOKABLE void clearData();
     Q_INVOKABLE void refreshPorts();
+    Q_INVOKABLE void resetByteCounters();
 
 signals:
     // 属性变化通知
@@ -80,6 +85,8 @@ signals:
     void showTxChanged();
     void showRxChanged();
     void hexDisplayChanged();
+    void bytesReceivedChanged();
+    void bytesSentChanged();
     
     // 数据更新信号
     void dataReceived(const QString &data, const QString &timestamp);
@@ -104,6 +111,10 @@ private:
     bool m_showRx;
     bool m_hexDisplay;
     
+    // 字节计数
+    qint64 m_bytesReceived;
+    qint64 m_bytesSent;
+    
     // 数据存储
     struct DataItem {
         QString data;
@@ -120,6 +131,9 @@ private:
     void appendToDataList(const QString &data, bool isTx);
     void updateDisplayData();
     QString byteArrayToHex(const QByteArray &data);
+    
+    // 定时器
+    QTimer *m_updateTimer;
 };
 
 #endif // SERIAL_COMMUNICATION_MANAGER_H

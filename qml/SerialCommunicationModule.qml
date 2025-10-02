@@ -10,6 +10,14 @@ Rectangle {
     border.color: "#464647"
     radius: 5
 
+    // 格式化字节数的函数
+    function formatBytes(bytes) {
+        if (bytes === 0) return "0 B"
+        if (bytes < 1024) return bytes + " B"
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB"
+        return (bytes / (1024 * 1024)).toFixed(1) + " MB"
+    }
+
     // 创建串口通信管理器实例
     SerialCommManager {
         id: serialManager
@@ -216,6 +224,25 @@ Rectangle {
             }
         }
 
+        // 字节计数显示（发送区域上方，右对齐）
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.alignment: Qt.AlignRight
+            spacing: 10
+            
+            Text {
+                text: "接收: " + (serialManager ? formatBytes(serialManager.bytesReceived) : "0 B")
+                color: "#00FF00"
+                font.pixelSize: 12
+            }
+            
+            Text {
+                text: "发送: " + (serialManager ? formatBytes(serialManager.bytesSent) : "0 B")
+                color: "#00BFFF"
+                font.pixelSize: 12
+            }
+        }
+
         // 发送区域
         RowLayout {
             Layout.fillWidth: true
@@ -350,13 +377,32 @@ Rectangle {
                 }
             }
             
-            
             Item { Layout.fillWidth: true } // 弹簧
             
             Button {
+                id: clearButton
                 text: "清空"
-                width: 60
-                onClicked: if(serialManager) serialManager.clearData()
+                width: 50
+                height: 24
+                background: Rectangle {
+                    color: clearButton.pressed ? "#1066CC" : (clearButton.hovered ? "#1177DD" : "#0E639C")
+                    radius: 3
+                    border.width: 1
+                    border.color: "#464647"
+                }
+                contentItem: Text {
+                    text: clearButton.text
+                    color: "#FFFFFF"
+                    font.pixelSize: 11
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                onClicked: {
+                    if(serialManager) {
+                        serialManager.clearData()
+                        serialManager.resetByteCounters()
+                    }
+                }
             }
     
         }

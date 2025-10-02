@@ -22,11 +22,10 @@ qt_add_qml_module(appFOC_CTRL
         qml/MotorModeControlModule.qml
         qml/MotorDataReadWriteModule.qml
         qml/LogModule.qml
+        qml/CommandControlModule.qml
     SOURCES 
-
-        serial_communication_manager.h serial_communication_manager.cpp
-        SOURCES serial_communication_manager.h
-        SOURCES serial_communication_manager.cpp
+        serial_communication_manager.h
+        serial_communication_manager.cpp
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.

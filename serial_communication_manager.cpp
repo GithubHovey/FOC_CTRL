@@ -8,11 +8,21 @@ SerialCommunicationManager::SerialCommunicationManager(QObject *parent)
     , m_showTx(true)
     , m_showRx(true)
     , m_hexDisplay(true)
+    , m_bytesReceived(0)
+    , m_bytesSent(0)
+    , m_updateTimer(new QTimer(this))
 {
     // 连接串口信号
     connect(m_serialPort, &QSerialPort::readyRead, this, &SerialCommunicationManager::onReadyRead);
     connect(m_serialPort, QOverload<QSerialPort::SerialPortError>::of(&QSerialPort::errorOccurred),
             this, &SerialCommunicationManager::onErrorOccurred);
+    
+    // 设置定时器，每100ms更新一次字节计数显示
+    connect(m_updateTimer, &QTimer::timeout, [this]() {
+        emit bytesReceivedChanged();
+        emit bytesSentChanged();
+    });
+    m_updateTimer->start(100); // 100ms更新一次
     
     // 初始化可用端口列表
     scanAvailablePorts();
@@ -83,6 +93,9 @@ bool SerialCommunicationManager::sendData(const QString &data)
     qint64 bytesWritten = m_serialPort->write(sendData);
     
     if (bytesWritten > 0) {
+        // 更新发送字节计数
+        m_bytesSent += bytesWritten;
+        
         QString formattedData = formatData(sendData, true);
         
         // *** 优化：根据显示设置决定是否将数据添加到缓冲区 ***
@@ -106,7 +119,11 @@ void SerialCommunicationManager::clearData()
 {
     m_dataList.clear();
     m_displayData.clear();
+    m_bytesReceived = 0;
+    m_bytesSent = 0;
     emit displayDataChanged();
+    emit bytesReceivedChanged();
+    emit bytesSentChanged();
 }
 
 void SerialCommunicationManager::refreshPorts()
@@ -122,6 +139,9 @@ void SerialCommunicationManager::onReadyRead()
     
     // 防御性编程：确保确实读取到了数据
     if (!data.isEmpty()) {
+        // 更新接收字节计数
+        m_bytesReceived += data.size();
+        
         // 将原始二进制数据格式化为可显示的字符串
         // formatData()会处理非打印字符、根据m_hexDisplay设置进行HEX转换等
         QString formattedData = formatData(data, false);
@@ -274,4 +294,12 @@ void SerialCommunicationManager::updateAvailablePorts()
 {
     // 调用现有的scanAvailablePorts()方法来实现相同功能
     scanAvailablePorts();
+}
+
+void SerialCommunicationManager::resetByteCounters()
+{
+    m_bytesReceived = 0;
+    m_bytesSent = 0;
+    emit bytesReceivedChanged();
+    emit bytesSentChanged();
 }
