@@ -376,6 +376,7 @@ void SerialCommunicationManager::processCmdQueue()
             qint64 bytesWritten = m_serialPort->write(cmd);
             if (bytesWritten > 0) {
                 // 更新发送字节计数
+                m_serialPort->flush();
                 m_bytesSent += bytesWritten;
                 emit bytesSentChanged();
                 
