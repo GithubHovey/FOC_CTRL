@@ -222,22 +222,24 @@ Rectangle {
                 ValueAxis {
                     id: axisX
                     min: 0
-                    max: 100
-                    titleText: qsTr("时间 (秒)")
+                    max: 20000
+                    titleText: qsTr("时间 (ms)")
+                    labelFormat: "%.0f"
                 }
                 
                 // Y轴
                 ValueAxis {
                     id: axisY
-                    min: -10
-                    max: 10
-                    titleText: qsTr("数值")
+                    min: -50000
+                    max: 50000
+                    titleText: qsTr("值")
+                    labelFormat: "%.0f"
                 }
                 
 
             }
             
-            // X轴滑块控制
+            // X轴滚动条
             Slider {
                 id: xAxisSlider
                 anchors {
@@ -248,22 +250,25 @@ Rectangle {
                 }
                 height: 20
                 from: 0
-                to: 100
-                value: 0
+                to: 1
+                value: FOC.FOCChartManager.scrollPosition
+                
+                // 动态计算滚动条长度（可见范围占总数据范围的比例）
+                property real visibleRange: axisX.max - axisX.min
+                property real totalRange: FOC.FOCChartManager.dataLengthMs
+                property real handleSizeRatio: Math.max(visibleRange / totalRange, 0.05) // 最小为5%，避免滚动条太小
+                
                 onValueChanged: {
-                    // 控制X轴视窗移动
-                    var range = axisX.max - axisX.min
-                    var newMin = value / 100 * range
-                    var newMax = newMin + range * 0.2 // 显示20%的数据范围
-                    axisX.min = newMin
-                    axisX.max = newMax
+                    // 更新C++后端的滚动条位置
+                    FOC.FOCChartManager.setScrollPosition(value)
                 }
+                
                 background: Rectangle {
                     color: "#3C3C3C"
                     radius: 2
                 }
                 handle: Rectangle {
-                    width: 12
+                    width: parent.width * parent.handleSizeRatio
                     height: 12
                     radius: 6
                     color: "#FFFFFF"
@@ -271,80 +276,47 @@ Rectangle {
                 }
             }
             
-            // Y轴滑块控制
-            Slider {
-                id: yAxisSlider
-                anchors {
-                    top: parent.top
-                    bottom: parent.bottom
-                    right: parent.right
-                    margins: 5
-                }
-                width: 20
-                orientation: Qt.Vertical
-                from: 0
-                to: 100
-                value: 50
-                onValueChanged: {
-                    // 控制Y轴视窗移动
-                    var range = axisY.max - axisY.min
-                    var center = axisY.min + range * (value / 100)
-                    var halfRange = range * 0.5
-                    axisY.min = center - halfRange
-                    axisY.max = center + halfRange
-                }
-                background: Rectangle {
-                    color: "#3C3C3C"
-                    radius: 2
-                }
-                handle: Rectangle {
-                    width: 12
-                    height: 12
-                    radius: 6
-                    color: "#FFFFFF"
-                    border.color: "#CCCCCC"
-                }
-            }
-            
-            // 缩放控制按钮
-            Row {
-                anchors {
-                    top: parent.top
-                    right: yAxisSlider.left
-                    margins: 5
-                }
-                spacing: 5
+            // 鼠标滚轮缩放功能
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.NoButton
+                hoverEnabled: true
                 
-                Button {
-                    text: "+"
-                    width: 30
-                    height: 30
-                    onClicked: {
-                        // X轴放大
-                        var xRange = axisX.max - axisX.min
-                        axisX.min += xRange * 0.1
-                        axisX.max -= xRange * 0.1
-                    }
-                    background: Rectangle {
-                        color: "#3C3C3C"
-                        radius: 3
-                    }
-                }
+                property real zoomFactor: 1.1
                 
-                Button {
-                    text: "-"
-                    width: 30
-                    height: 30
-                    onClicked: {
-                        // X轴缩小
-                        var xRange = axisX.max - axisX.min
-                        axisX.min -= xRange * 0.1
-                        axisX.max += xRange * 0.1
-                    }
-                    background: Rectangle {
-                        color: "#3C3C3C"
-                        radius: 3
-                    }
+                onWheel: {
+                    var delta = wheel.angleDelta.y / 120
+                    // 修正缩放方向：向上滚动放大，向下滚动缩小
+                    var zoom = Math.pow(zoomFactor, -delta)
+                    
+                    // 获取当前X轴和Y轴范围
+                    var xRange = axisX.max - axisX.min
+                    var yRange = axisY.max - axisY.min
+                    
+                    // 计算新的X轴和Y轴范围
+                    var newXRange = xRange * zoom
+                    var newYRange = yRange * zoom
+                    
+                    // 计算新的X轴和Y轴范围中心点
+                    var centerX = (axisX.min + axisX.max) / 2
+                    var centerY = (axisY.min + axisY.max) / 2
+                    
+                    // 更新X轴和Y轴范围
+                    axisX.min = centerX - newXRange / 2
+                    axisX.max = centerX + newXRange / 2
+                    axisY.min = centerY - newYRange / 2
+                    axisY.max = centerY + newYRange / 2
+                    
+                    // 更新滚动条位置（初始滚动条占轨道的100%）
+                    var totalDataLength = FOC.FOCChartManager.dataLengthMs
+                    var visibleRange = axisX.max - axisX.min
+                    var scrollPosition = axisX.min / (totalDataLength - visibleRange)
+                    
+                    if (scrollPosition < 0.0) scrollPosition = 0.0
+                    if (scrollPosition > 1.0) scrollPosition = 1.0
+                    
+                    // 更新C++后端的视图状态
+                    FOC.FOCChartManager.updateViewState(axisX.min, axisX.max, axisY.min, axisY.max, zoom)
                 }
             }
         }
@@ -413,12 +385,18 @@ Rectangle {
                     verticalAlignment: Text.AlignVCenter
                 }
                 onClicked: {
-                    series1.clear()
+                    // 清空所有动态添加的曲线
+                    for (var i = 0; i < chartView.count; i++) {
+                        var series = chartView.series(i)
+                        if (series && series.objectName !== "axisX" && series.objectName !== "axisY") {
+                            series.clear()
+                        }
+                    }
                     dataTimer.timeCounter = 0
                     axisX.min = 0
-                    axisX.max = 100
-                    axisY.min = -10
-                    axisY.max = 10
+                    axisX.max = 20000
+                    axisY.min = -50000
+                    axisY.max = 50000
                     clearChartRequested()
                 }
             }

@@ -71,6 +71,100 @@ QStringList FOCChartManager::getAllAvailableVariables() const
     return m_availableVariables;
 }
 
+double FOCChartManager::scrollPosition() const
+{
+    return m_viewState.scrollPosition;
+}
+
+void FOCChartManager::setScrollPosition(double position)
+{
+    if (position < 0.0) position = 0.0;
+    if (position > 1.0) position = 1.0;
+    
+    if (qFuzzyCompare(m_viewState.scrollPosition, position))
+        return;
+    
+    m_viewState.scrollPosition = position;
+    emit scrollPositionChanged();
+    
+    log(QString("Scroll position updated to: %1").arg(position));
+}
+
+double FOCChartManager::zoomFactor() const
+{
+    return m_viewState.zoomFactor;
+}
+
+QRectF FOCChartManager::viewRange() const
+{
+    return m_viewState.viewRange;
+}
+
+void FOCChartManager::updateViewState(double xMin, double xMax, double yMin, double yMax, double zoom)
+{
+    bool changed = false;
+    
+    // 更新视图范围
+    QRectF newRange(xMin, yMin, xMax - xMin, yMax - yMin);
+    if (m_viewState.viewRange != newRange) {
+        m_viewState.viewRange = newRange;
+        changed = true;
+    }
+    
+    // 更新缩放倍数
+    if (!qFuzzyCompare(m_viewState.zoomFactor, zoom)) {
+        m_viewState.zoomFactor = zoom;
+        changed = true;
+    }
+    
+    // 计算并更新滚动条位置（使用实际的数据长度）
+    double totalRange = m_viewState.dataLengthMs;
+    double visibleRange = xMax - xMin;
+    
+    // 避免除以零的情况
+    double newPosition = 0.0;
+    if (totalRange > visibleRange) {
+        newPosition = xMin / (totalRange - visibleRange);
+    } else {
+        // 当可见范围大于等于总数据范围时，滚动条位置为0（显示全部数据）
+        newPosition = 0.0;
+    }
+    
+    if (newPosition < 0.0) newPosition = 0.0;
+    if (newPosition > 1.0) newPosition = 1.0;
+    
+    if (!qFuzzyCompare(m_viewState.scrollPosition, newPosition)) {
+        m_viewState.scrollPosition = newPosition;
+        emit scrollPositionChanged();
+    }
+    
+    if (changed) {
+        emit viewRangeChanged();
+        emit zoomFactorChanged();
+        
+        log(QString("View state updated - X: [%1, %2], Y: [%3, %4], Zoom: %5")
+            .arg(xMin).arg(xMax).arg(yMin).arg(yMax).arg(zoom));
+    }
+}
+
+double FOCChartManager::dataLengthMs() const
+{
+    return m_viewState.dataLengthMs;
+}
+
+void FOCChartManager::setDataLengthMs(double lengthMs)
+{
+    if (lengthMs < 0.0) lengthMs = 0.0;
+    
+    if (qFuzzyCompare(m_viewState.dataLengthMs, lengthMs))
+        return;
+    
+    m_viewState.dataLengthMs = lengthMs;
+    emit dataLengthMsChanged();
+    
+    log(QString("Data length updated to: %1 ms").arg(lengthMs));
+}
+
 void FOCChartManager::initializeAvailableVariables()
 {
     // 初始化所有可用的FOC系统变量
