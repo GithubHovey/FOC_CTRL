@@ -119,8 +119,8 @@ ApplicationWindow {
                         onClearChartRequested: {
                             console.log("清空曲线")
                         }
-                        onPauseDisplayRequested: {
-                            console.log("暂停显示")
+                        onToggleCollectionRequested: {
+                            console.log("采集状态切换:", chartModule.isCollecting)
                         }
                     }
                 }

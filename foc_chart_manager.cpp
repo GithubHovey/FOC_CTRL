@@ -4,12 +4,13 @@
 
 FOCChartManager::FOCChartManager(QObject *parent)
     : QObject(parent)
+    , m_isCollecting(false)  // 默认不开启采集
 {
     // 初始化变量列表和颜色映射
     initializeAvailableVariables();
     initializeVariableColors();
     
-    log("FOCChartManager initialized");
+    log("FOCChartManager initialized - 采集状态: 未开启");
 }
 
 QStringList FOCChartManager::availableVariables() const
@@ -221,4 +222,30 @@ void FOCChartManager::log(const QString &message)
     
     // 发送日志信号
     emit logMessage(logMsg);
+}
+
+// 采集状态相关方法实现
+bool FOCChartManager::isCollecting() const
+{
+    return m_isCollecting;
+}
+
+void FOCChartManager::setIsCollecting(bool collecting)
+{
+    if (m_isCollecting == collecting)
+        return;
+    
+    m_isCollecting = collecting;
+    emit isCollectingChanged();
+    
+    if (m_isCollecting) {
+        log("开始采集数据");
+    } else {
+        log("停止采集数据");
+    }
+}
+
+void FOCChartManager::toggleCollection()
+{
+    setIsCollecting(!m_isCollecting);
 }

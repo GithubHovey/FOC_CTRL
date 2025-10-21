@@ -11,7 +11,7 @@ Rectangle {
     border.color: "#464647"
 
     property alias chartTitle: chartTitleText.text
-    property bool isPaused: false
+    property bool isCollecting: false
     
     // 从后端管理器获取变量列表
     property var variableList: []
@@ -19,7 +19,7 @@ Rectangle {
     signal addVariableRequested()
     signal exportDataRequested()
     signal clearChartRequested()
-    signal pauseDisplayRequested()
+    signal toggleCollectionRequested()
     
     // 添加变量函数 - 现在调用后端管理器
     function addVariable(varName) {
@@ -137,6 +137,12 @@ Rectangle {
         initializeVariables();
         // 初始化变量列表显示
         updateVariableList();
+        
+        // 连接后端采集状态变化信号
+        FOC.FOCChartManager.isCollectingChanged.connect(function() {
+            // 同步前端采集状态
+            isCollecting = FOC.FOCChartManager.isCollecting
+        })
     }
     
     // 实际数据接收器 - 从C++后端获取转速数据
@@ -328,19 +334,38 @@ Rectangle {
             spacing: 10
 
             Button {
-                text: qsTr("添加变量")
-                Layout.fillWidth: true
-                background: Rectangle {
-                    color: "#3C3C3C"
+            id: collectionButton
+            Layout.fillWidth: true
+            background: Rectangle {
+                color: isCollecting ? "#f44336" : "#4CAF50"
+                radius: 5
+            }
+            contentItem: Row {
+                anchors.centerIn: parent
+                spacing: 5
+                
+                Text {
+                    text: isCollecting ? "⏹" : "▶"
+                    color: "#FFFFFF"
+                    font.pixelSize: 16
+                    font.bold: true
                 }
-                contentItem: Text {
-                    text: qsTr("添加变量")
+                
+                Text {
+                    text: isCollecting ? qsTr("停止采集") : qsTr("开始采集")
                     color: "#FFFFFF"
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
-                onClicked: showAddVariableDialog = true
             }
+            onClicked: {
+                // 调用后端管理器的采集状态切换方法
+                FOC.FOCChartManager.toggleCollection()
+                // 同步前端状态
+                isCollecting = FOC.FOCChartManager.isCollecting
+                toggleCollectionRequested()
+            }
+        }
 
             Button {
                 text: qsTr("清除变量")
@@ -402,22 +427,18 @@ Rectangle {
             }
 
             Button {
-                id: pauseButton
-                text: isPaused ? qsTr("继续显示") : qsTr("暂停显示")
+                text: qsTr("添加变量")
                 Layout.fillWidth: true
                 background: Rectangle {
-                    color: isPaused ? "#FF6B6B" : "#3C3C3C"
+                    color: "#3C3C3C"
                 }
                 contentItem: Text {
-                    text: isPaused ? qsTr("继续显示") : qsTr("暂停显示")
+                    text: qsTr("添加变量")
                     color: "#FFFFFF"
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
-                onClicked: {
-                    isPaused = !isPaused
-                    pauseDisplayRequested()
-                }
+                onClicked: showAddVariableDialog = true
             }
         }
         

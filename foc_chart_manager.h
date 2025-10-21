@@ -38,6 +38,9 @@ class FOCChartManager : public QObject
     Q_PROPERTY(double zoomFactor READ zoomFactor NOTIFY zoomFactorChanged)
     Q_PROPERTY(QRectF viewRange READ viewRange NOTIFY viewRangeChanged)
     Q_PROPERTY(double dataLengthMs READ dataLengthMs WRITE setDataLengthMs NOTIFY dataLengthMsChanged)
+    
+    // 采集状态属性
+    Q_PROPERTY(bool isCollecting READ isCollecting WRITE setIsCollecting NOTIFY isCollectingChanged)
 
 public:
     explicit FOCChartManager(QObject *parent = nullptr);
@@ -75,6 +78,11 @@ public:
     // 数据长度相关方法
     double dataLengthMs() const;
     void setDataLengthMs(double lengthMs);
+    
+    // 采集状态相关方法
+    bool isCollecting() const;
+    void setIsCollecting(bool collecting);
+    Q_INVOKABLE void toggleCollection();
 
 signals:
     void availableVariablesChanged();
@@ -87,6 +95,7 @@ signals:
     void zoomFactorChanged();
     void viewRangeChanged();
     void dataLengthMsChanged();
+    void isCollectingChanged();
 
 private:
     // 初始化可用变量列表
@@ -105,6 +114,7 @@ private:
     QStringList m_selectedVariables;       // 当前选中的变量
     QHash<QString, QColor> m_variableColors; // 变量颜色映射
     ViewState m_viewState;                  // 视图状态
+    bool m_isCollecting;                    // 采集状态
 };
 
 #endif // FOC_CHART_MANAGER_H
