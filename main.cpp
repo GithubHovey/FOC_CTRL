@@ -1,12 +1,13 @@
-#include <QGuiApplication>
+#include <QApplication>
 #include <QQmlApplicationEngine>
 #include <QQuickStyle> // 添加QQuickStyle头文件
 #include "serial_communication_manager.h" // 添加串口通信管理器
 #include "command_control_manager.h"
+#include "foc_chart_manager.h"
 
 int main(int argc, char *argv[])
 {
-    QGuiApplication app(argc, argv);
+    QApplication app(argc, argv);
     
     // 设置应用样式为Basic，支持控件自定义
     QQuickStyle::setStyle("Basic");
@@ -26,6 +27,12 @@ int main(int argc, char *argv[])
                                                       Q_UNUSED(scriptEngine)
                                                       return CommandControlManager::getInstance();
                                                   });
+    qmlRegisterSingletonType<FOCChartManager>("FOC_CTRL", 1, 0, "FOCChartManager",
+                                             [](QQmlEngine *engine, QJSEngine *scriptEngine) -> QObject * {
+                                                 Q_UNUSED(engine)
+                                                 Q_UNUSED(scriptEngine)
+                                                 return new FOCChartManager();
+                                             });
     QObject::connect(
         &engine,
         &QQmlApplicationEngine::objectCreationFailed,

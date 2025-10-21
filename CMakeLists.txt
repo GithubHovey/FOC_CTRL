@@ -28,6 +28,8 @@ qt_add_qml_module(appFOC_CTRL
         serial_communication_manager.cpp
         command_control_manager.h
         command_control_manager.cpp
+        foc_chart_manager.h
+        foc_chart_manager.cpp
         ringbuf.h
         ringbuf.c
 )
