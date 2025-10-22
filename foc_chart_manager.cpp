@@ -5,12 +5,23 @@
 FOCChartManager::FOCChartManager(QObject *parent)
     : QObject(parent)
     , m_isCollecting(false)  // 默认不开启采集
+    , m_debugTimer(nullptr)  // 调试定时器
+    , m_debugStartTime(0)    // 调试开始时间
+    , m_debugSineWaveRunning(false) // 调试正弦波未运行
 {
     // 初始化变量列表和颜色映射
     initializeAvailableVariables();
     initializeVariableColors();
     
-    log("FOCChartManager initialized - 采集状态: 未开启");
+    // 初始化变量数值存储
+    m_variableValues.clear();
+    
+    // 创建调试定时器
+    m_debugTimer = new QTimer(this);
+    m_debugTimer->setInterval(50); // 50ms更新一次，20Hz频率
+    connect(m_debugTimer, &QTimer::timeout, this, &FOCChartManager::updateDebugSineValue);
+    
+    log("FOCChartManager initialized - 采集状态: 未开启，变量数值接口已就绪");
 }
 
 QStringList FOCChartManager::availableVariables() const
@@ -51,10 +62,13 @@ void FOCChartManager::addVariable(const QString &variableName)
         emit variableColorsChanged();
     }
     
+    // 为变量设置初始值0
+    m_variableValues[variableName] = 0.0;
+    
     m_selectedVariables.append(variableName);
     emit selectedVariablesChanged();
     
-    log(QString("Variable '%1' added to chart").arg(variableName));
+    log(QString("变量 '%1' 已添加到图表，初始值设置为: 0").arg(variableName));
     emit variableAdded(variableName, m_variableColors[variableName]);
 }
 
@@ -179,7 +193,8 @@ void FOCChartManager::initializeAvailableVariables()
         "电压",
         "温度",
         "功率",
-        "效率"
+        "效率",
+        "调试正弦波"  // 新增调试变量
     };
     
     log(QString("Available variables initialized: %1 variables").arg(m_availableVariables.size()));
@@ -198,6 +213,7 @@ void FOCChartManager::initializeVariableColors()
     m_variableColors["温度"] = QColor("#FF9F43");     // 橙色
     m_variableColors["功率"] = QColor("#5F27CD");     // 紫色
     m_variableColors["效率"] = QColor("#00D2D3");     // 青色
+    m_variableColors["调试正弦波"] = QColor("#FFA500"); // 橙色，用于调试变量
     
     log("Variable colors initialized");
 }
@@ -240,12 +256,116 @@ void FOCChartManager::setIsCollecting(bool collecting)
     
     if (m_isCollecting) {
         log("开始采集数据");
+        
+        // 为所有选中的变量设置初始值0
+        for (const QString &variableName : m_selectedVariables) {
+            if (!m_variableValues.contains(variableName)) {
+                m_variableValues[variableName] = 0.0;
+                log(QString("变量 '%1' 初始值设置为: 0").arg(variableName));
+            }
+        }
+        
+        // 如果调试变量存在，自动启动调试正弦波信号发生器
+        if (m_availableVariables.contains("调试正弦波")) {
+            startDebugSineWave();
+        }
     } else {
         log("停止采集数据");
+        // 停止调试正弦波信号发生器
+        stopDebugSineWave();
     }
 }
 
 void FOCChartManager::toggleCollection()
 {
     setIsCollecting(!m_isCollecting);
+}
+
+// 变量数值更新方法实现
+void FOCChartManager::updateVariableValue(const QString &variableName, double value)
+{
+    // 存储变量数值
+    m_variableValues[variableName] = value;
+    
+    // 发出信号通知变量值已改变
+    emit variableValueChanged(variableName, value);
+    
+    // 记录调试信息
+    log(QString("变量 '%1' 数值已更新: %2").arg(variableName).arg(value));
+}
+
+// 获取变量当前值方法实现
+double FOCChartManager::getVariableValue(const QString &variableName) const
+{
+    // 如果变量存在，返回其当前值；否则返回0.0
+    if (m_variableValues.contains(variableName)) {
+        return m_variableValues[variableName];
+    }
+    
+    // 变量不存在，返回默认值0.0
+    return 0.0;
+}
+
+void FOCChartManager::updateDebugSineValue()
+{
+    // 检查运行条件：调试变量存在且采集状态打开
+    if (!m_debugSineWaveRunning || !m_isCollecting) {
+        return;
+    }
+    
+    // 检查变量哈希表中是否存在"调试正弦波"变量
+    if (!m_availableVariables.contains("调试正弦波")) {
+        log("调试正弦波变量不存在，停止信号发生器");
+        stopDebugSineWave();
+        return;
+    }
+    
+    // 计算经过的时间（秒）
+    qint64 currentTime = QDateTime::currentMSecsSinceEpoch();
+    double elapsedTime = (currentTime - m_debugStartTime) / 1000.0;
+    
+    // 生成正弦波：周期2秒（频率0.5Hz），幅度1000，无偏置
+    double debugValue = 1000.0 * std::sin(2.0 * M_PI * 0.5 * elapsedTime);
+    
+    // 使用统一的变量数值更新接口
+    updateVariableValue("调试正弦波", debugValue);
+}
+
+void FOCChartManager::startDebugSineWave()
+{
+    if (m_debugSineWaveRunning) {
+        log("调试正弦波已经在运行");
+        return;
+    }
+    
+    // 检查变量哈希表中是否存在"调试正弦波"变量
+    if (!m_availableVariables.contains("调试正弦波")) {
+        log("调试正弦波变量不存在，无法启动信号发生器");
+        return;
+    }
+    
+    // 检查采集状态是否打开
+    if (!m_isCollecting) {
+        log("采集状态未打开，无法启动调试正弦波信号发生器");
+        return;
+    }
+    
+    m_debugStartTime = QDateTime::currentMSecsSinceEpoch();
+    m_debugSineWaveRunning = true;
+    m_debugTimer->start();
+    
+    log("调试正弦波已启动 - 周期: 2秒, 幅度: 1000, 无偏置");
+}
+
+void FOCChartManager::stopDebugSineWave()
+{
+    if (!m_debugSineWaveRunning) {
+        log("调试正弦波未在运行");
+        return;
+    }
+    
+    m_debugSineWaveRunning = false;
+    m_debugTimer->stop();
+    
+    log("调试正弦波已停止");
 }

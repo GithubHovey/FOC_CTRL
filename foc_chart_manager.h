@@ -9,6 +9,9 @@
 #include <QHash>
 #include <QStringList>
 #include <QRectF>
+#include <QTimer>
+#include <QThread>
+#include <cmath>
 
 class FOCChartManager : public QObject
 {
@@ -41,6 +44,8 @@ class FOCChartManager : public QObject
     
     // 采集状态属性
     Q_PROPERTY(bool isCollecting READ isCollecting WRITE setIsCollecting NOTIFY isCollectingChanged)
+    
+
 
 public:
     explicit FOCChartManager(QObject *parent = nullptr);
@@ -83,6 +88,16 @@ public:
     bool isCollecting() const;
     void setIsCollecting(bool collecting);
     Q_INVOKABLE void toggleCollection();
+    
+    // 变量数值更新方法
+    Q_INVOKABLE void updateVariableValue(const QString &variableName, double value);
+    
+    // 获取变量当前值
+    Q_INVOKABLE double getVariableValue(const QString &variableName) const;
+    
+    // 调试变量信号发生器控制方法
+    Q_INVOKABLE void startDebugSineWave();
+    Q_INVOKABLE void stopDebugSineWave();
 
 signals:
     void availableVariablesChanged();
@@ -96,6 +111,7 @@ signals:
     void viewRangeChanged();
     void dataLengthMsChanged();
     void isCollectingChanged();
+    void variableValueChanged(const QString &variableName, double value);
 
 private:
     // 初始化可用变量列表
@@ -110,11 +126,22 @@ private:
     // 记录日志
     void log(const QString &message);
     
+    // 调试变量相关方法
+    void updateDebugSineValue();
+    
     QStringList m_availableVariables;      // 所有可用的变量
     QStringList m_selectedVariables;       // 当前选中的变量
     QHash<QString, QColor> m_variableColors; // 变量颜色映射
     ViewState m_viewState;                  // 视图状态
     bool m_isCollecting;                    // 采集状态
+    
+    // 变量数值存储
+    QHash<QString, double> m_variableValues;
+    
+    // 调试变量相关成员
+    QTimer* m_debugTimer;                  // 调试定时器
+    qint64 m_debugStartTime;               // 调试开始时间
+    bool m_debugSineWaveRunning;           // 调试正弦波是否运行
 };
 
 #endif // FOC_CHART_MANAGER_H

@@ -39,6 +39,7 @@ Rectangle {
         
         // 创建新的曲线系列
         var newSeries = chartView.createSeries(ChartView.SeriesTypeLine, varName, axisX, axisY);
+        console.log("创建曲线系列:", varName, "成功:", newSeries !== null);
         newSeries.color = varColor;
         newSeries.width = 2;
         
@@ -49,6 +50,8 @@ Rectangle {
             enabled: true,
             series: newSeries
         });
+        
+        console.log("添加变量后变量列表长度:", variableList.length);
         
         // 更新变量列表显示
         updateVariableList();
@@ -91,9 +94,8 @@ Rectangle {
                     MouseArea {
                         anchors.fill: parent
                         onClicked: {
-                            enabled = !enabled;
-                            variableList[index].enabled = enabled;
-                            variableList[index].series.visible = enabled;
+                            // 移除可见性切换功能，保持变量标签为纯显示用途
+                            console.log("变量标签点击: ", varName, " (可见性功能已禁用)");
                         }
                     }
                 }
@@ -128,8 +130,12 @@ Rectangle {
     
     // 初始化变量列表
     function initializeVariables() {
+        console.log("开始初始化变量列表...");
         // 添加默认的转速变量
         addVariable("转速");
+        // 添加调试正弦波变量
+        addVariable("调试正弦波");
+        console.log("变量列表初始化完成，当前变量数量:", variableList.length);
     }
     
     Component.onCompleted: {
@@ -148,6 +154,43 @@ Rectangle {
     // 实际数据接收器 - 从C++后端获取转速数据
     property real timeCounter: 0
     
+    // 主动读取定时器 - 10ms读取一次变量值
+    Timer {
+        id: variableReadTimer
+        interval: 10  // 10ms读取一次
+        running: isCollecting  // 只在采集状态下运行
+        repeat: true
+        onTriggered: {
+            // 为每个变量读取当前值并更新曲线
+            for (var i = 0; i < variableList.length; i++) {
+                var variableName = variableList[i].name
+                var currentValue = FOC.FOCChartManager.getVariableValue(variableName)
+                
+                // 时间计数器递增（以秒为单位，与X轴一致）
+                timeCounter += 0.01  // 调整为0.01秒，对应100Hz的更新频率
+                
+                // 处理数据，添加到对应的曲线系列
+                variableList[i].series.append(timeCounter, currentValue)
+                
+                // 限制数据点数量，避免内存溢出
+                if (variableList[i].series.count > 1000) {
+                    variableList[i].series.remove(0)
+                }
+                
+                // 自动调整X轴范围（以秒为单位）
+                if (timeCounter > axisX.max) {
+                    axisX.max = timeCounter
+                    axisX.min = Math.max(0, timeCounter - 10)  // 显示最近10秒的数据
+                }
+                
+                // 输出调试信息（减少日志频率，避免过多输出）
+                if (timeCounter % 1.0 < 0.01) {  // 每秒输出一次
+                    console.log("变量数据读取: ", variableName, " 值: ", currentValue, " 时间: ", timeCounter)
+                }
+            }
+        }
+    }
+    
     // 连接到串口通信管理器的数据接收信号
     Connections {
         target: SerialCommManager
@@ -155,25 +198,9 @@ Rectangle {
         function onCmdReadDataReceived(dataId, dataValue) {
             // 检查是否为当前转速数据 (DATA_ID_SPEED_CURRENT = 0x18)
             if (dataId === 0x18) {
-                // 时间计数器递增
-                timeCounter += 0.1
-                
-                // 将数据值转换为实际转速值 (单位: RPM)
-                var speedValue = dataValue
-                
-                // 添加数据点到曲线
-                series1.append(timeCounter, speedValue)
-                
-                // 限制数据点数量，避免内存溢出
-                if (series1.count > 1000) {
-                    series1.remove(0)
-                }
-                
-                // 自动调整X轴范围
-                if (timeCounter > axisX.max) {
-                    axisX.max = timeCounter
-                    axisX.min = Math.max(0, timeCounter - 100)
-                }
+                console.log("接收到转速数据: ", dataValue)
+                // 使用统一的变量数值更新接口
+                FOC.FOCChartManager.updateVariableValue("转速", dataValue)
             }
         }
     }
@@ -228,16 +255,16 @@ Rectangle {
                 ValueAxis {
                     id: axisX
                     min: 0
-                    max: 20000
-                    titleText: qsTr("时间 (ms)")
-                    labelFormat: "%.0f"
+                    max: 20  // 改为秒为单位，显示20秒范围
+                    titleText: qsTr("时间 (s)")
+                    labelFormat: "%.1f"
                 }
                 
                 // Y轴
                 ValueAxis {
                     id: axisY
-                    min: -50000
-                    max: 50000
+                    min: -1200  // 调整为适合调试正弦波的幅值范围
+                    max: 1200
                     titleText: qsTr("值")
                     labelFormat: "%.0f"
                 }
@@ -363,6 +390,7 @@ Rectangle {
                 FOC.FOCChartManager.toggleCollection()
                 // 同步前端状态
                 isCollecting = FOC.FOCChartManager.isCollecting
+                
                 toggleCollectionRequested()
             }
         }
@@ -450,7 +478,7 @@ Rectangle {
             standardButtons: Dialog.Ok | Dialog.Cancel
             visible: showAddVariableDialog
             width: 400
-            height: 300
+            height: 350  // 对话框总高度
             
             onAccepted: {
                 // 获取选中的变量
@@ -474,41 +502,54 @@ Rectangle {
                     text: qsTr("请选择要添加到图表的变量：")
                     color: "#FFFFFF"
                     font.pixelSize: 14
+                    Layout.alignment: Qt.AlignTop
                 }
                 
-                ListView {
-                    id: variableListView
+                // 列表容器，设置固定高度，为底部按钮预留空间
+                Rectangle {
                     Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    model: FOC.FOCChartManager.getAllAvailableVariables()
-                    clip: true
+                    Layout.preferredHeight: 250  // 列表区域固定高度
+                    color: "transparent"
                     
-                    delegate: Rectangle {
-                        width: parent.width
-                        height: 40
-                        color: ListView.isCurrentItem ? "#3C3C3C" : "transparent"
+                    ListView {
+                        id: variableListView
+                        anchors.fill: parent
+                        model: FOC.FOCChartManager.getAllAvailableVariables()
+                        clip: true
                         
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            anchors.left: parent.left
-                            anchors.leftMargin: 10
-                            text: modelData
-                            color: "#FFFFFF"
-                            font.pixelSize: 14
-                        }
-                        
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: {
-                                variableListView.currentIndex = index;
+                        delegate: Rectangle {
+                            width: parent.width
+                            height: 40
+                            color: ListView.isCurrentItem ? "#3C3C3C" : "transparent"
+                            
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.left: parent.left
+                                anchors.leftMargin: 10
+                                text: modelData
+                                color: "#FFFFFF"
+                                font.pixelSize: 14
+                            }
+                            
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    variableListView.currentIndex = index;
+                                }
                             }
                         }
+                        
+                        highlight: Rectangle {
+                            color: "#4ECDC4"
+                            radius: 2
+                        }
                     }
-                    
-                    highlight: Rectangle {
-                        color: "#4ECDC4"
-                        radius: 2
-                    }
+                }
+                
+                // 占位空间，确保底部按钮不会遮挡内容
+                Item {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 20  // 为底部按钮预留额外空间
                 }
             }
             
