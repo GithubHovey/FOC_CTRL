@@ -299,21 +299,21 @@ Rectangle {
                     var xRange = axisX.max - axisX.min
                     var yRange = axisY.max - axisY.min
                     
+                    // 计算鼠标位置对应的坐标值
+                    var mouseX = wheel.x / chartView.width * xRange + axisX.min
+                    var mouseY = (chartView.height - wheel.y) / chartView.height * yRange + axisY.min
+                    
                     // 计算新的X轴和Y轴范围
                     var newXRange = xRange * zoom
                     var newYRange = yRange * zoom
                     
-                    // 计算新的X轴和Y轴范围中心点
-                    var centerX = (axisX.min + axisX.max) / 2
-                    var centerY = (axisY.min + axisY.max) / 2
+                    // 以鼠标位置为中心进行缩放
+                    axisX.min = mouseX - (mouseX - axisX.min) * zoom
+                    axisX.max = mouseX + (axisX.max - mouseX) * zoom
+                    axisY.min = mouseY - (mouseY - axisY.min) * zoom
+                    axisY.max = mouseY + (axisY.max - mouseY) * zoom
                     
-                    // 更新X轴和Y轴范围
-                    axisX.min = centerX - newXRange / 2
-                    axisX.max = centerX + newXRange / 2
-                    axisY.min = centerY - newYRange / 2
-                    axisY.max = centerY + newYRange / 2
-                    
-                    // 更新滚动条位置（初始滚动条占轨道的100%）
+                    // 更新滚动条位置
                     var totalDataLength = FOC.FOCChartManager.dataLengthMs
                     var visibleRange = axisX.max - axisX.min
                     var scrollPosition = axisX.min / (totalDataLength - visibleRange)
