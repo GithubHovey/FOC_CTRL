@@ -187,20 +187,6 @@ Rectangle {
             }
         }
     }
-    
-    // 连接到串口通信管理器的数据接收信号
-    Connections {
-        target: SerialCommManager
-        
-        function onCmdReadDataReceived(dataId, dataValue) {
-            // 检查是否为当前转速数据 (DATA_ID_SPEED_CURRENT = 0x18)
-            if (dataId === 0x18) {
-                console.log("接收到转速数据: ", dataValue)
-                // 使用统一的变量数值更新接口
-                FOC.FOCChartManager.updateVariableValue("转速", dataValue)
-            }
-        }
-    }
 
     ColumnLayout {
         anchors.fill: parent

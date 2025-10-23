@@ -181,19 +181,40 @@ void FOCChartManager::setDataLengthMs(double lengthMs)
 
 void FOCChartManager::initializeAvailableVariables()
 {
-    // 初始化所有可用的FOC系统变量
+    // 初始化所有可用的FOC系统变量（基于协议定义）
     m_availableVariables = QStringList{
+        "U相电流",
+        "V相电流", 
+        "W相电流",
         "转速",
-        "Q轴电流",
-        "D轴电流",
-        "位置",
-        "速度",
-        "转矩",
-        "电压",
-        "温度",
-        "功率",
-        "效率",
-        "调试正弦波"  // 新增调试变量
+        "Q轴电压",
+        "D轴电压",
+        "最大电流",
+        "母线电压",
+        "极对数",
+        "电角度",
+        "机械角",
+        "控制模式",
+        "接口模式",
+        "工作状态",
+        "力矩Kp",
+        "力矩Ki",
+        "力矩Kd",
+        "速度Kp",
+        "速度Ki",
+        "速度Kd",
+        "位置Kp",
+        "位置Ki",
+        "位置Kd",
+        "电流环时",
+        "CAN ID",
+        "机械零位",
+        "霍尔X偏",
+        "霍尔Y偏",
+        "霍尔状态",
+        "速度环时",
+        "位置环时",
+        "调试正弦波"  // 调试曲线，用于测试和演示
     };
     
     log(QString("Available variables initialized: %1 variables").arg(m_availableVariables.size()));
@@ -201,18 +222,22 @@ void FOCChartManager::initializeAvailableVariables()
 
 void FOCChartManager::initializeVariableColors()
 {
-    // 为常用变量设置预定义颜色
-    m_variableColors["转速"] = QColor("#FF6B6B");     // 红色
-    m_variableColors["Q轴电流"] = QColor("#4ECDC4");  // 青色
-    m_variableColors["D轴电流"] = QColor("#45B7D1");  // 蓝色
-    m_variableColors["位置"] = QColor("#96CEB4");     // 绿色
-    m_variableColors["速度"] = QColor("#FECA57");     // 黄色
-    m_variableColors["转矩"] = QColor("#FF9FF3");     // 粉色
-    m_variableColors["电压"] = QColor("#54A0FF");     // 蓝色
-    m_variableColors["温度"] = QColor("#FF9F43");     // 橙色
-    m_variableColors["功率"] = QColor("#5F27CD");     // 紫色
-    m_variableColors["效率"] = QColor("#00D2D3");     // 青色
-    m_variableColors["调试正弦波"] = QColor("#FFA500"); // 橙色，用于调试变量
+    // 定义循环颜色数组（避免白色和黑色）
+    QList<QString> colorPalette = {
+        "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FECA57",
+        "#FF9FF3", "#54A0FF", "#FF9F43", "#5F27CD", "#00D2D3",
+        "#FFA500", "#6A0572", "#AB83A1", "#3D5A80", "#98C1D9",
+        "#E0FBFC", "#EE6C4D", "#293241", "#F4A261", "#2A9D8F",
+        "#E9C46A", "#F4A261", "#E76F51", "#2A9D8F", "#264653",
+        "#E9C46A", "#F4A261", "#E76F51", "#2A9D8F", "#264653"
+    };
+    
+    // 为每个变量分配颜色（循环使用颜色数组）
+    for (int i = 0; i < m_availableVariables.size(); ++i) {
+        QString variableName = m_availableVariables[i];
+        QString colorCode = colorPalette[i % colorPalette.size()];
+        m_variableColors[variableName] = QColor(colorCode);
+    }
     
     log("Variable colors initialized");
 }
@@ -366,4 +391,103 @@ void FOCChartManager::stopDebugSineWave()
     m_debugTimer->stop();
     
     log("调试正弦波已停止");
+}
+
+void FOCChartManager::onReadDataReceived(uint8_t dataId, uint32_t dataValue)
+{
+    // 检查采集状态，只有在采集状态下才处理数据
+    if (!m_isCollecting) {
+        return;
+    }
+    
+    // 根据数据ID映射到对应的变量名称
+    QString variableName = getVariableNameFromDataId(dataId);
+    
+    // 如果变量名称无效，则忽略该数据
+    if (variableName.isEmpty()) {
+        log(QString("未知数据ID: %1, 值: %2").arg(dataId).arg(dataValue));
+        return;
+    }
+    
+    // 检查变量是否在可用变量列表中
+    if (!m_availableVariables.contains(variableName)) {
+        log(QString("数据ID %1 对应的变量 '%2' 不在可用变量列表中").arg(dataId).arg(variableName));
+        return;
+    }
+    
+    // 将32位无符号整数转换为double类型
+    double convertedValue = static_cast<double>(dataValue);
+    
+    // 更新变量数值
+    updateVariableValue(variableName, convertedValue);
+    
+    // 记录数据接收日志（避免过多输出，可以注释掉）
+    // log(QString("接收到数据 - 变量: %1, ID: %2, 值: %3").arg(variableName).arg(dataId).arg(convertedValue));
+}
+
+QString FOCChartManager::getVariableNameFromDataId(uint8_t dataId)
+{
+    // 数据ID到变量名称的映射表（基于协议定义）
+    switch (dataId) {
+        // 相电流相关
+        case 0x10: return "U相电流";  // DATA_ID_PHASE_CURRENT_U_TARGET
+        case 0x11: return "U相电流";  // DATA_ID_PHASE_CURRENT_U_CURRENT
+        case 0x12: return "V相电流";  // DATA_ID_PHASE_CURRENT_V_TARGET
+        case 0x13: return "V相电流";  // DATA_ID_PHASE_CURRENT_V_CURRENT
+        case 0x14: return "W相电流";  // DATA_ID_PHASE_CURRENT_W_TARGET
+        case 0x15: return "W相电流";  // DATA_ID_PHASE_CURRENT_W_CURRENT
+        
+        // 转速相关
+        case 0x16: return "转速";     // DATA_ID_SPEED_TARGET
+        case 0x17: return "转速";     // DATA_ID_SPEED_CURRENT
+        
+        // Q轴电压相关
+        case 0x18: return "Q轴电压";  // DATA_ID_Q_VOLTAGE_TARGET
+        case 0x19: return "Q轴电压";  // DATA_ID_Q_VOLTAGE_CURRENT
+        
+        // D轴电压相关
+        case 0x1A: return "D轴电压";  // DATA_ID_D_VOLTAGE_TARGET
+        case 0x1B: return "D轴电压";  // DATA_ID_D_VOLTAGE_CURRENT
+        
+        // 系统参数
+        case 0x1C: return "最大电流"; // DATA_ID_MAX_CURRENT_LIMIT
+        case 0x1D: return "母线电压"; // DATA_ID_BUS_VOLTAGE
+        case 0x1E: return "极对数";    // DATA_ID_POLE_PAIRS
+        
+        // 角度相关
+        case 0x1F: return "电角度";   // DATA_ID_ELECTRICAL_ANGLE_TARGET
+        case 0x20: return "电角度";   // DATA_ID_ELECTRICAL_ANGLE_CURRENT
+        case 0x21: return "机械角";   // DATA_ID_MECHANICAL_ANGLE_TARGET
+        case 0x22: return "机械角";   // DATA_ID_MECHANICAL_ANGLE_CURRENT
+        
+        // 模式状态
+        case 0x23: return "控制模式"; // DATA_ID_CONTROL_MODE
+        case 0x24: return "接口模式"; // DATA_ID_INTERFACE_MODE
+        case 0x25: return "工作状态"; // DATA_ID_MOTOR_STATE
+        
+        // PID参数
+        case 0x26: return "力矩Kp";   // DATA_ID_TORQUE_PID_KP
+        case 0x27: return "力矩Ki";   // DATA_ID_TORQUE_PID_KI
+        case 0x28: return "力矩Kd";   // DATA_ID_TORQUE_PID_KD
+        case 0x29: return "速度Kp";   // DATA_ID_SPEED_PID_KP
+        case 0x2A: return "速度Ki";   // DATA_ID_SPEED_PID_KI
+        case 0x2B: return "速度Kd";   // DATA_ID_SPEED_PID_KD
+        case 0x2C: return "位置Kp";   // DATA_ID_POSITION_PID_KP
+        case 0x2D: return "位置Ki";   // DATA_ID_POSITION_PID_KI
+        case 0x2E: return "位置Kd";   // DATA_ID_POSITION_PID_KD
+        
+        // 执行时间
+        case 0x2F: return "电流环时"; // DATA_ID_TORQUE_LOOP_EXECUTION_TIME
+        
+        // 其他参数
+        case 0x30: return "CAN ID";   // DATA_ID_CAN_ID
+        case 0x31: return "机械零位"; // DATA_ID_MECHANICAL_ZERO_POSITION
+        case 0x32: return "霍尔X偏";  // DATA_ID_HALL_X_DC_OFFSET
+        case 0x33: return "霍尔Y偏";  // DATA_ID_HALL_Y_DC_OFFSET
+        case 0x34: return "霍尔状态"; // DATA_ID_HALL_CALIBRATION_STATUS
+        case 0x35: return "速度环时"; // DATA_ID_SPEED_LOOP_EXECUTION_TIME
+        case 0x36: return "位置环时"; // DATA_ID_POSITION_LOOP_EXECUTION_TIME
+        
+        default: return QString(); // 未知数据ID返回空字符串
+    }
 }

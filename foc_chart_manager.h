@@ -98,6 +98,9 @@ public:
     // 调试变量信号发生器控制方法
     Q_INVOKABLE void startDebugSineWave();
     Q_INVOKABLE void stopDebugSineWave();
+    
+    // 串口数据接收处理槽函数
+    Q_INVOKABLE void onReadDataReceived(uint8_t dataId, uint32_t dataValue);
 
 signals:
     void availableVariablesChanged();
@@ -128,6 +131,9 @@ private:
     
     // 调试变量相关方法
     void updateDebugSineValue();
+    
+    // 数据ID到变量名称映射方法
+    QString getVariableNameFromDataId(uint8_t dataId);
     
     QStringList m_availableVariables;      // 所有可用的变量
     QStringList m_selectedVariables;       // 当前选中的变量
