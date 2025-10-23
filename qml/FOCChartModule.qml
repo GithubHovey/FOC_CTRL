@@ -166,27 +166,24 @@ Rectangle {
                 var variableName = variableList[i].name
                 var currentValue = FOC.FOCChartManager.getVariableValue(variableName)
                 
-                // 时间计数器递增（以秒为单位，与X轴一致）
-                timeCounter += 0.01  // 调整为0.01秒，对应100Hz的更新频率
+                // 时间计数器递增（以毫秒为单位，与X轴一致）
+                timeCounter += 10  // 10ms，对应100Hz的更新频率
                 
                 // 处理数据，添加到对应的曲线系列
                 variableList[i].series.append(timeCounter, currentValue)
                 
-                // 限制数据点数量，避免内存溢出
-                if (variableList[i].series.count > 1000) {
+                // 限制数据点数量，避免内存溢出（保留20000ms的数据）
+                if (variableList[i].series.count > 2000) {  // 20000ms / 10ms = 2000个点
                     variableList[i].series.remove(0)
                 }
                 
-                // 自动调整X轴范围（以秒为单位）
+                // 自动调整X轴范围（以毫秒为单位）
                 if (timeCounter > axisX.max) {
                     axisX.max = timeCounter
-                    axisX.min = Math.max(0, timeCounter - 10)  // 显示最近10秒的数据
+                    axisX.min = Math.max(0, timeCounter - 20000)  // 显示最近20000ms的数据
                 }
                 
-                // 输出调试信息（减少日志频率，避免过多输出）
-                if (timeCounter % 1.0 < 0.01) {  // 每秒输出一次
-                    console.log("变量数据读取: ", variableName, " 值: ", currentValue, " 时间: ", timeCounter)
-                }
+                // 调试信息已移除，避免控制台输出过多信息
             }
         }
     }
@@ -255,9 +252,9 @@ Rectangle {
                 ValueAxis {
                     id: axisX
                     min: 0
-                    max: 20  // 改为秒为单位，显示20秒范围
-                    titleText: qsTr("时间 (s)")
-                    labelFormat: "%.1f"
+                    max: 20000  // 改为毫秒为单位，显示20000ms范围
+                    titleText: qsTr("时间 (ms)")
+                    labelFormat: "%.0f"
                 }
                 
                 // Y轴
@@ -292,8 +289,10 @@ Rectangle {
                 property real handleSizeRatio: Math.max(visibleRange / totalRange, 0.05) // 最小为5%，避免滚动条太小
                 
                 onValueChanged: {
-                    // 更新C++后端的滚动条位置
-                    FOC.FOCChartManager.setScrollPosition(value)
+                    // 更新C++后端的滚动条位置，添加安全检查
+                    if (FOC.FOCChartManager && typeof FOC.FOCChartManager.setScrollPosition === "function") {
+                        FOC.FOCChartManager.setScrollPosition(value)
+                    }
                 }
                 
                 background: Rectangle {
@@ -309,13 +308,67 @@ Rectangle {
                 }
             }
             
-            // 鼠标滚轮缩放功能
+            // 鼠标交互功能
             MouseArea {
                 anchors.fill: parent
-                acceptedButtons: Qt.NoButton
+                acceptedButtons: Qt.MiddleButton | Qt.LeftButton | Qt.RightButton
                 hoverEnabled: true
                 
                 property real zoomFactor: 1.1
+                property real lastX: 0
+                property real lastY: 0
+                property bool dragging: false
+                
+                onPressed: {
+                    if (mouse.button === Qt.MiddleButton) {
+                        dragging = true
+                        lastX = mouse.x
+                        lastY = mouse.y
+                        cursorShape = Qt.ClosedHandCursor
+                    }
+                }
+                
+                onPositionChanged: {
+                    if (dragging && mouse.buttons === Qt.MiddleButton) {
+                        var deltaX = mouse.x - lastX
+                        var deltaY = mouse.y - lastY
+                        
+                        // 计算X轴和Y轴的范围
+                        var xRange = axisX.max - axisX.min
+                        var yRange = axisY.max - axisY.min
+                        
+                        // 根据鼠标移动距离计算坐标变化量
+                        var xDelta = -deltaX / chartView.width * xRange
+                        var yDelta = deltaY / chartView.height * yRange
+                        
+                        // 更新X轴和Y轴范围
+                        axisX.min += xDelta
+                        axisX.max += xDelta
+                        axisY.min += yDelta
+                        axisY.max += yDelta
+                        
+                        // 更新滚动条位置
+                        var totalDataLength = FOC.FOCChartManager.dataLengthMs
+                        var visibleRange = axisX.max - axisX.min
+                        var scrollPosition = axisX.min / (totalDataLength - visibleRange)
+                        
+                        if (scrollPosition < 0.0) scrollPosition = 0.0
+                        if (scrollPosition > 1.0) scrollPosition = 1.0
+                        
+                        // 更新C++后端的视图状态
+                        FOC.FOCChartManager.updateViewState(axisX.min, axisX.max, axisY.min, axisY.max, 1.0)
+                        
+                        lastX = mouse.x
+                        lastY = mouse.y
+                    }
+                }
+                
+                onReleased: {
+                    if (mouse.button === Qt.MiddleButton) {
+                        dragging = false
+                        cursorShape = Qt.ArrowCursor
+                    }
+                }
                 
                 onWheel: {
                     var delta = wheel.angleDelta.y / 120
@@ -448,8 +501,8 @@ Rectangle {
                     dataTimer.timeCounter = 0
                     axisX.min = 0
                     axisX.max = 20000
-                    axisY.min = -50000
-                    axisY.max = 50000
+                    axisY.min = -1200
+                    axisY.max = 1200
                     clearChartRequested()
                 }
             }

@@ -157,8 +157,7 @@ void FOCChartManager::updateViewState(double xMin, double xMax, double yMin, dou
         emit viewRangeChanged();
         emit zoomFactorChanged();
         
-        log(QString("View state updated - X: [%1, %2], Y: [%3, %4], Zoom: %5")
-            .arg(xMin).arg(xMax).arg(yMin).arg(yMax).arg(zoom));
+        // 视图状态更新日志已移除，避免控制台输出过多信息
     }
 }
 
@@ -290,8 +289,7 @@ void FOCChartManager::updateVariableValue(const QString &variableName, double va
     // 发出信号通知变量值已改变
     emit variableValueChanged(variableName, value);
     
-    // 记录调试信息
-    log(QString("变量 '%1' 数值已更新: %2").arg(variableName).arg(value));
+    // 变量数值更新日志已移除，避免控制台输出过多信息
 }
 
 // 获取变量当前值方法实现
