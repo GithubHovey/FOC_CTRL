@@ -12,6 +12,7 @@
 #include <QTimer>
 #include <QThread>
 #include <cmath>
+#include "DOC/motor_protocol.h"  // 包含协议定义
 
 class FOCChartManager : public QObject
 {
@@ -123,6 +124,12 @@ private:
     // 初始化变量颜色映射
     void initializeVariableColors();
     
+    // 初始化变量名到数据ID的映射
+    void initializeVariableToDataIdMapping();
+    
+    // 发送读取变量指令
+    void sendReadVariableCommands();
+    
     // 生成随机颜色
     QColor generateRandomColor() const;
     
@@ -138,6 +145,7 @@ private:
     QStringList m_availableVariables;      // 所有可用的变量
     QStringList m_selectedVariables;       // 当前选中的变量
     QHash<QString, QColor> m_variableColors; // 变量颜色映射
+    QHash<QString, quint8> m_variableToDataId; // 变量名到数据ID的映射
     ViewState m_viewState;                  // 视图状态
     bool m_isCollecting;                    // 采集状态
     
@@ -147,7 +155,8 @@ private:
     // 调试变量相关成员
     QTimer* m_debugTimer;                  // 调试定时器
     qint64 m_debugStartTime;               // 调试开始时间
-    bool m_debugSineWaveRunning;           // 调试正弦波是否运行
+    bool m_debugSineWaveRunning;           // 调试正弦波运行状态
+    QTimer* m_readCommandTimer;            // 读取指令定时器
 };
 
 #endif // FOC_CHART_MANAGER_H

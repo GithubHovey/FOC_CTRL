@@ -1,4 +1,5 @@
 #include "foc_chart_manager.h"
+#include "serial_communication_manager.h"
 #include <QDebug>
 #include <QRandomGenerator>
 
@@ -8,6 +9,7 @@ FOCChartManager::FOCChartManager(QObject *parent)
     , m_debugTimer(nullptr)  // 调试定时器
     , m_debugStartTime(0)    // 调试开始时间
     , m_debugSineWaveRunning(false) // 调试正弦波未运行
+    , m_readCommandTimer(nullptr)   // 读取指令定时器
 {
     // 初始化变量列表和颜色映射
     initializeAvailableVariables();
@@ -20,6 +22,11 @@ FOCChartManager::FOCChartManager(QObject *parent)
     m_debugTimer = new QTimer(this);
     m_debugTimer->setInterval(50); // 50ms更新一次，20Hz频率
     connect(m_debugTimer, &QTimer::timeout, this, &FOCChartManager::updateDebugSineValue);
+    
+    // 创建读取指令定时器
+    m_readCommandTimer = new QTimer(this);
+    m_readCommandTimer->setInterval(10); // 10ms发送一次读取指令，100Hz频率
+    connect(m_readCommandTimer, &QTimer::timeout, this, &FOCChartManager::sendReadVariableCommands);
     
     log("FOCChartManager initialized - 采集状态: 未开启，变量数值接口已就绪");
 }
@@ -217,7 +224,50 @@ void FOCChartManager::initializeAvailableVariables()
         "调试正弦波"  // 调试曲线，用于测试和演示
     };
     
+    // 初始化变量名到数据ID的映射
+    initializeVariableToDataIdMapping();
+    
     log(QString("Available variables initialized: %1 variables").arg(m_availableVariables.size()));
+}
+
+void FOCChartManager::initializeVariableToDataIdMapping()
+{
+    // 变量名到数据ID的映射关系
+    m_variableToDataId = QHash<QString, quint8>{
+        {"U相电流", DATA_ID_PHASE_CURRENT_U_CURRENT},
+        {"V相电流", DATA_ID_PHASE_CURRENT_V_CURRENT},
+        {"W相电流", DATA_ID_PHASE_CURRENT_W_CURRENT},
+        {"转速", DATA_ID_SPEED_CURRENT},
+        {"Q轴电压", DATA_ID_Q_VOLTAGE_CURRENT},
+        {"D轴电压", DATA_ID_D_VOLTAGE_CURRENT},
+        {"最大电流", DATA_ID_MAX_CURRENT_LIMIT},
+        {"母线电压", DATA_ID_BUS_VOLTAGE},
+        {"极对数", DATA_ID_POLE_PAIRS},
+        {"电角度", DATA_ID_ELECTRICAL_ANGLE_CURRENT},
+        {"机械角", DATA_ID_MECHANICAL_ANGLE_CURRENT},
+        {"控制模式", DATA_ID_CONTROL_MODE},
+        {"接口模式", DATA_ID_INTERFACE_MODE},
+        {"工作状态", DATA_ID_MOTOR_STATE},
+        {"力矩Kp", DATA_ID_TORQUE_PID_KP},
+        {"力矩Ki", DATA_ID_TORQUE_PID_KI},
+        {"力矩Kd", DATA_ID_TORQUE_PID_KD},
+        {"速度Kp", DATA_ID_SPEED_PID_KP},
+        {"速度Ki", DATA_ID_SPEED_PID_KI},
+        {"速度Kd", DATA_ID_SPEED_PID_KD},
+        {"位置Kp", DATA_ID_POSITION_PID_KP},
+        {"位置Ki", DATA_ID_POSITION_PID_KI},
+        {"位置Kd", DATA_ID_POSITION_PID_KD},
+        {"电流环时", DATA_ID_TORQUE_LOOP_EXECUTION_TIME},
+        {"CAN ID", DATA_ID_CAN_ID},
+        {"机械零位", DATA_ID_MECHANICAL_ZERO_POSITION},
+        {"霍尔X偏", DATA_ID_HALL_X_DC_OFFSET},
+        {"霍尔Y偏", DATA_ID_HALL_Y_DC_OFFSET},
+        {"霍尔状态", DATA_ID_HALL_CALIBRATION_STATUS},
+        {"速度环时", DATA_ID_SPEED_LOOP_EXECUTION_TIME},
+        {"位置环时", DATA_ID_POSITION_LOOP_EXECUTION_TIME}
+    };
+    
+    log("Variable to data ID mapping initialized");
 }
 
 void FOCChartManager::initializeVariableColors()
@@ -289,12 +339,20 @@ void FOCChartManager::setIsCollecting(bool collecting)
             }
         }
         
+        // 发送读取变量指令
+        sendReadVariableCommands();
+        
+        // 启动读取指令定时器，实现实时数据采集
+        m_readCommandTimer->start();
+        
         // 如果调试变量存在，自动启动调试正弦波信号发生器
         if (m_availableVariables.contains("调试正弦波")) {
             startDebugSineWave();
         }
     } else {
         log("停止采集数据");
+        // 停止读取指令定时器
+        m_readCommandTimer->stop();
         // 停止调试正弦波信号发生器
         stopDebugSineWave();
     }
@@ -489,5 +547,40 @@ QString FOCChartManager::getVariableNameFromDataId(uint8_t dataId)
         case 0x36: return "位置环时"; // DATA_ID_POSITION_LOOP_EXECUTION_TIME
         
         default: return QString(); // 未知数据ID返回空字符串
+    }
+}
+
+void FOCChartManager::sendReadVariableCommands()
+{
+    // 获取SerialCommunicationManager单例实例
+    SerialCommunicationManager* serialManager = SerialCommunicationManager::getInstance();
+    
+    // 检查串口是否已连接
+    if (!serialManager->isConnected()) {
+        qDebug() << "串口未连接，无法发送读取指令";
+        return;
+    }
+    
+    // 遍历选中的变量列表，发送读取指令
+    for (const QString& variableName : m_selectedVariables) {
+        // 查找变量对应的数据ID
+        if (m_variableToDataId.contains(variableName)) {
+            quint8 dataId = m_variableToDataId[variableName];
+            
+            // 构建10字节数据区（数据ID + 9字节填充0）
+            QByteArray data(10, 0x00);
+            data[0] = dataId; // 第一个字节为数据ID
+            
+            // 发送读取指令
+            bool success = serialManager->pushCmd(data, CMD_READ_DATA);
+            
+            if (success) {
+                qDebug() << "发送读取指令成功，变量:" << variableName << "数据ID:" << QString("0x%1").arg(dataId, 2, 16, QChar('0'));
+            } else {
+                qDebug() << "发送读取指令失败，变量:" << variableName;
+            }
+        } else {
+            qDebug() << "未找到变量对应的数据ID:" << variableName;
+        }
     }
 }

@@ -33,9 +33,14 @@ int main(int argc, char *argv[])
                                                  Q_UNUSED(scriptEngine)
                                                  return new FOCChartManager();
                                              });
+    
     // 连接串口通信管理器到图表管理器，用于接收实时数据
-    // 注意：FOCChartManager不是单例模式，需要通过QML上下文获取实例
-    // 信号连接将在QML中完成
+    // 在C++层面直接建立信号连接，避免QML中转
+    FOCChartManager* chartManager = new FOCChartManager();
+    QObject::connect(SerialCommunicationManager::getInstance(), 
+                     &SerialCommunicationManager::cmdReadDataReceived,
+                     chartManager,
+                     &FOCChartManager::onReadDataReceived);
     
     QObject::connect(
         &engine,
