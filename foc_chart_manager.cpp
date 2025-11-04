@@ -557,7 +557,7 @@ void FOCChartManager::sendReadVariableCommands()
     
     // 检查串口是否已连接
     if (!serialManager->isConnected()) {
-        qDebug() << "串口未连接，无法发送读取指令";
+        // qDebug() << "串口未连接，无法发送读取指令";
         return;
     }
     

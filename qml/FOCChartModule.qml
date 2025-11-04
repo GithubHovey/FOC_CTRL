@@ -311,21 +311,33 @@ Rectangle {
                         lastX = mouse.x
                         lastY = mouse.y
                         cursorShape = Qt.ClosedHandCursor
+                    } else if (mouse.button === Qt.LeftButton) {
+                        // 左键点击显示坐标
+                        showCoordinate(mouse.x, mouse.y)
                     }
                 }
                 
                 onPositionChanged: {
                     if (dragging && mouse.buttons === Qt.MiddleButton) {
-                        var deltaX = mouse.x - lastX
-                        var deltaY = mouse.y - lastY
+                        // 获取图表的实际绘图区域
+                        var plotArea = chartView.plotArea
+                        
+                        // 计算鼠标在绘图区域内的相对位置变化
+                        var relativeX = mouse.x - plotArea.x
+                        var relativeY = mouse.y - plotArea.y
+                        var lastRelativeX = lastX - plotArea.x
+                        var lastRelativeY = lastY - plotArea.y
+                        
+                        var deltaX = relativeX - lastRelativeX
+                        var deltaY = relativeY - lastRelativeY
                         
                         // 计算X轴和Y轴的范围
                         var xRange = axisX.max - axisX.min
                         var yRange = axisY.max - axisY.min
                         
                         // 根据鼠标移动距离计算坐标变化量
-                        var xDelta = -deltaX / chartView.width * xRange
-                        var yDelta = deltaY / chartView.height * yRange
+                        var xDelta = -deltaX / plotArea.width * xRange
+                        var yDelta = deltaY / plotArea.height * yRange
                         
                         // 更新X轴和Y轴范围
                         axisX.min += xDelta
@@ -357,27 +369,38 @@ Rectangle {
                 }
                 
                 onWheel: {
-                    var delta = wheel.angleDelta.y / 120
-                    // 修正缩放方向：向上滚动放大，向下滚动缩小
-                    var zoom = Math.pow(zoomFactor, -delta)
+                    // 获取图表的实际绘图区域
+                    var plotArea = chartView.plotArea
                     
-                    // 获取当前X轴和Y轴范围
+                    // 计算鼠标在绘图区域内的相对位置
+                    var relativeX = wheel.x - plotArea.x
+                    var relativeY = wheel.y - plotArea.y
+                    
+                    // 检查鼠标是否在绘图区域内
+                    if (relativeX < 0 || relativeX > plotArea.width ||
+                        relativeY < 0 || relativeY > plotArea.height) {
+                        return
+                    }
+                    
+                    // 计算鼠标位置对应的图表坐标（作为缩放中心）
                     var xRange = axisX.max - axisX.min
                     var yRange = axisY.max - axisY.min
                     
-                    // 计算鼠标位置对应的坐标值
-                    var mouseX = wheel.x / chartView.width * xRange + axisX.min
-                    var mouseY = (chartView.height - wheel.y) / chartView.height * yRange + axisY.min
+                    var centerX = relativeX / plotArea.width * xRange + axisX.min
+                    var centerY = (plotArea.height - relativeY) / plotArea.height * yRange + axisY.min
+                    
+                    // 计算缩放因子
+                    var zoomFactor = wheel.angleDelta.y > 0 ? 0.8 : 1.25
                     
                     // 计算新的X轴和Y轴范围
-                    var newXRange = xRange * zoom
-                    var newYRange = yRange * zoom
+                    var newXRange = xRange * zoomFactor
+                    var newYRange = yRange * zoomFactor
                     
                     // 以鼠标位置为中心进行缩放
-                    axisX.min = mouseX - (mouseX - axisX.min) * zoom
-                    axisX.max = mouseX + (axisX.max - mouseX) * zoom
-                    axisY.min = mouseY - (mouseY - axisY.min) * zoom
-                    axisY.max = mouseY + (axisY.max - mouseY) * zoom
+                    axisX.min = centerX - (relativeX / plotArea.width) * newXRange
+                    axisX.max = axisX.min + newXRange
+                    axisY.min = centerY - ((plotArea.height - relativeY) / plotArea.height) * newYRange
+                    axisY.max = axisY.min + newYRange
                     
                     // 更新滚动条位置
                     var totalDataLength = FOC.FOCChartManager.dataLengthMs
@@ -389,6 +412,86 @@ Rectangle {
                     
                     // 更新C++后端的视图状态
                     FOC.FOCChartManager.updateViewState(axisX.min, axisX.max, axisY.min, axisY.max, zoom)
+                }
+                
+                // 显示坐标的函数
+                function showCoordinate(mouseX, mouseY) {
+                    // 获取图表的实际绘图区域（排除坐标轴标签和标题的边距）
+                    var plotArea = chartView.plotArea
+                    
+                    // 检查鼠标是否在绘图区域内
+                    if (mouseX < plotArea.x || mouseX > plotArea.x + plotArea.width ||
+                        mouseY < plotArea.y || mouseY > plotArea.y + plotArea.height) {
+                        // 鼠标在绘图区域外，不显示坐标
+                        coordinateText.visible = false
+                        return
+                    }
+                    
+                    // 计算鼠标在绘图区域内的相对位置
+                    var relativeX = mouseX - plotArea.x
+                    var relativeY = mouseY - plotArea.y
+                    
+                    // 计算鼠标位置对应的图表坐标
+                    var xRange = axisX.max - axisX.min
+                    var yRange = axisY.max - axisY.min
+                    
+                    var chartX = relativeX / plotArea.width * xRange + axisX.min
+                    var chartY = (plotArea.height - relativeY) / plotArea.height * yRange + axisY.min
+                    
+                    // 格式化坐标显示
+                    var xText = "X: " + chartX.toFixed(2)
+                    var yText = "Y: " + chartY.toFixed(2)
+                    
+                    // 显示坐标文本
+                    coordinateTextContent.text = xText + "\n" + yText
+                    coordinateText.visible = true
+                    
+                    // 设置坐标文本位置
+                    coordinateText.x = Math.min(mouseX + 10, chartView.width - coordinateText.width - 10)
+                    coordinateText.y = Math.min(mouseY + 10, chartView.height - coordinateText.height - 10)
+                    
+                    // 启动2秒后隐藏的定时器
+                    coordinateTimer.restart()
+                }
+            }
+            
+            // 坐标显示文本
+            Rectangle {
+                id: coordinateText
+                visible: false
+                z: 10
+                width: coordinateTextContent.width + 16
+                height: coordinateTextContent.height + 16
+                color: "#80000000"
+                radius: 5
+                
+                Text {
+                    id: coordinateTextContent
+                    anchors.centerIn: parent
+                    color: "#FFFFFF"
+                    font.pixelSize: 12
+                    font.bold: true
+                    style: Text.Outline
+                    styleColor: "#000000"
+                }
+                
+                // 确保文本不会超出图表边界
+                onXChanged: {
+                    if (x < 0) x = 0
+                    if (x + width > chartView.width) x = chartView.width - width
+                }
+                onYChanged: {
+                    if (y < 0) y = 0
+                    if (y + height > chartView.height) y = chartView.height - height
+                }
+            }
+            
+            // 坐标显示定时器（2秒后隐藏）
+            Timer {
+                id: coordinateTimer
+                interval: 2000 // 2秒
+                onTriggered: {
+                    coordinateText.visible = false
                 }
             }
         }
