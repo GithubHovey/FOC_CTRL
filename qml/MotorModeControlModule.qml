@@ -9,10 +9,40 @@ Rectangle {
     border.color: "#464647"
     radius: 5
 
+    // 后端管理器属性
+    property alias motorModeManager: motorModeManager
+    
+    // 创建电机模式控制管理器
+    MotorModeControlManager {
+        id: motorModeManager
+        
+        onCurrentModeChanged: {
+            // 模式改变时发送控制命令
+            motorModeManager.sendControlCommand()
+        }
+        
+        onParameterValueChanged: {
+            // 参数值改变时发送控制命令
+            motorModeManager.sendControlCommand()
+        }
+        
+        onIsEnabledChanged: {
+            // 使能状态改变时发送控制命令
+            motorModeManager.sendControlCommand()
+        }
+        
+        onLogMessage: {
+            // 将日志消息转发到日志模块
+            if (typeof logModule !== 'undefined') {
+                logModule.addLogMessage(message)
+            }
+        }
+    }
+    
+    // 前端属性别名
     property alias controlMode: controlModeComboBox.currentText
     property alias parameterValue: parameterTextField.text
-    property alias parameterSliderValue: parameterSlider.value
-    property bool isEnabled: enableButton.text === "禁能"
+    property bool isEnabled: motorModeManager.isEnabled
     
     signal enableToggled()
     signal parameterChanged(real value)
@@ -49,28 +79,31 @@ Rectangle {
                     verticalAlignment: Text.AlignVCenter
                     elide: Text.ElideRight
                 }
+                onActivated: {
+                    // 将选择的模式设置到后端管理器
+                    motorModeManager.setModeFromString(currentText)
+                }
+                Component.onCompleted: {
+                    // 初始化时设置默认模式
+                    motorModeManager.setModeFromString(currentText)
+                }
             }
 
             Button {
                 id: enableButton
-                text: qsTr("使能")
+                text: motorModeManager.isEnabled ? qsTr("禁能") : qsTr("使能")
                 background: Rectangle {
-                    color: "#3C3C3C"
+                    color: motorModeManager.isEnabled ? "#E74C3C" : "#3C3C3C"
                 }
                 contentItem: Text {
-                    text: qsTr("使能")
+                    text: motorModeManager.isEnabled ? qsTr("禁能") : qsTr("使能")
                     color: "#FFFFFF"
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
                 onClicked: {
-                    if (text === "使能") {
-                        text = "禁能"
-                        motorModeControlModule.isEnabled = true
-                    } else {
-                        text = "使能"
-                        motorModeControlModule.isEnabled = false
-                    }
+                    // 切换使能状态
+                    motorModeManager.toggleEnable()
                     enableToggled()
                 }
             }
@@ -94,7 +127,7 @@ Rectangle {
                 TextField {
                     id: parameterTextField
                     width: 60
-                    text: "50"
+                    text: motorModeManager.parameterValue.toFixed(1)
                     horizontalAlignment: TextInput.AlignHCenter
                     background: Rectangle {
                         color: "#3C3C3C"
@@ -105,7 +138,7 @@ Rectangle {
                     onTextChanged: {
                         var value = parseFloat(text)
                         if (!isNaN(value)) {
-                            parameterSlider.value = value
+                            motorModeManager.setParameterValue(value)
                             parameterChanged(value)
                         }
                     }
@@ -117,7 +150,7 @@ Rectangle {
                 Layout.fillWidth: true
                 from: 0
                 to: 100
-                value: 50
+                value: motorModeManager.parameterValue
                 background: Rectangle {
                     color: "#3C3C3C"
                     border.width: 1
@@ -130,7 +163,8 @@ Rectangle {
                     radius: 8
                 }
                 onValueChanged: {
-                    parameterTextField.text = value.toString()
+                    motorModeManager.setParameterValue(value)
+                    parameterTextField.text = value.toFixed(1)
                     parameterChanged(value)
                 }
             }

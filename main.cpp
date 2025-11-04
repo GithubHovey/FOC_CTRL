@@ -4,6 +4,7 @@
 #include "serial_communication_manager.h" // 添加串口通信管理器
 #include "command_control_manager.h"
 #include "foc_chart_manager.h"
+#include "motor_mode_control_manager.h" // 添加电机模式控制管理器
 
 int main(int argc, char *argv[])
 {
@@ -33,6 +34,9 @@ int main(int argc, char *argv[])
                                                  Q_UNUSED(scriptEngine)
                                                  return new FOCChartManager();
                                              });
+    
+    // 注册电机模式控制管理器
+    qmlRegisterType<MotorModeControlManager>("FOC_CTRL", 1, 0, "MotorModeControlManager");
     
     // 连接串口通信管理器到图表管理器，用于接收实时数据
     // 在C++层面直接建立信号连接，避免QML中转

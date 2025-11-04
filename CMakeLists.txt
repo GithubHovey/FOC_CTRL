@@ -30,6 +30,8 @@ qt_add_qml_module(appFOC_CTRL
         command_control_manager.cpp
         foc_chart_manager.h
         foc_chart_manager.cpp
+        motor_mode_control_manager.h
+        motor_mode_control_manager.cpp
         ringbuf.h
         ringbuf.c
 )
