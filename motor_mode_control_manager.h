@@ -24,6 +24,9 @@ public:
     Q_PROPERTY(double targetPosition READ targetPosition WRITE setTargetPosition NOTIFY targetPositionChanged)
     Q_PROPERTY(bool isEnabled READ isEnabled WRITE setIsEnabled NOTIFY isEnabledChanged)
     Q_PROPERTY(double parameterValue READ parameterValue WRITE setParameterValue NOTIFY parameterValueChanged)
+    Q_PROPERTY(double torqueParameter READ torqueParameter WRITE setTorqueParameter NOTIFY torqueParameterChanged)
+    Q_PROPERTY(double speedParameter READ speedParameter WRITE setSpeedParameter NOTIFY speedParameterChanged)
+    Q_PROPERTY(double positionParameter READ positionParameter WRITE setPositionParameter NOTIFY positionParameterChanged)
 
 public:
     explicit MotorModeControlManager(QObject *parent = nullptr);
@@ -35,6 +38,9 @@ public:
     double targetPosition() const;
     bool isEnabled() const;
     double parameterValue() const;
+    double torqueParameter() const;
+    double speedParameter() const;
+    double positionParameter() const;
     
     // 属性设置方法
     void setCurrentMode(ControlMode mode);
@@ -43,6 +49,9 @@ public:
     void setTargetPosition(double position);
     void setIsEnabled(bool enabled);
     void setParameterValue(double value);
+    void setTorqueParameter(double value);
+    void setSpeedParameter(double value);
+    void setPositionParameter(double value);
     
     // QML可调用方法
     Q_INVOKABLE void toggleEnable();
@@ -57,6 +66,9 @@ signals:
     void targetPositionChanged();
     void isEnabledChanged();
     void parameterValueChanged();
+    void torqueParameterChanged();
+    void speedParameterChanged();
+    void positionParameterChanged();
     void controlCommandSent(ControlMode mode, double value);
     void logMessage(const QString &message);
 
@@ -73,6 +85,9 @@ private:
     double m_targetPosition;        // 目标位置 (度)
     bool m_isEnabled;               // 使能状态
     double m_parameterValue;        // 参数值 (0-100)
+    double m_torqueParameter;       // 力矩模式参数值 (0-100)
+    double m_speedParameter;        // 速度模式参数值 (0-100)
+    double m_positionParameter;     // 位置模式参数值 (0-100)
 };
 
 #endif // MOTOR_MODE_CONTROL_MANAGER_H

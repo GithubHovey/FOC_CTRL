@@ -8,7 +8,10 @@ MotorModeControlManager::MotorModeControlManager(QObject *parent)
     , m_targetSpeed(0.0)
     , m_targetPosition(0.0)
     , m_isEnabled(false)
-    , m_parameterValue(50.0)
+    , m_parameterValue(0.0)
+    , m_torqueParameter(0.0)
+    , m_speedParameter(0.0)
+    , m_positionParameter(0.0)
 {
     log("电机模式控制管理器初始化完成");
 }
@@ -44,17 +47,46 @@ double MotorModeControlManager::parameterValue() const
     return m_parameterValue;
 }
 
+double MotorModeControlManager::torqueParameter() const
+{
+    return m_torqueParameter;
+}
+
+double MotorModeControlManager::speedParameter() const
+{
+    return m_speedParameter;
+}
+
+double MotorModeControlManager::positionParameter() const
+{
+    return m_positionParameter;
+}
+
 // 属性设置方法
 void MotorModeControlManager::setCurrentMode(ControlMode mode)
 {
     if (m_currentMode != mode) {
         m_currentMode = mode;
-        log(QString("控制模式切换为: %1").arg(getModeString()));
         
-        // 切换模式时，根据当前参数值更新对应的目标值
+        // 切换模式时，更新参数值显示为对应模式的参数值
+        switch (mode) {
+        case TORQUE_MODE:
+            m_parameterValue = m_torqueParameter;
+            break;
+        case SPEED_MODE:
+            m_parameterValue = m_speedParameter;
+            break;
+        case POSITION_MODE:
+            m_parameterValue = m_positionParameter;
+            break;
+        }
+        
+        // 根据当前参数值更新对应的目标值
         updateTargetValueFromParameter();
         
+        log(QString("控制模式切换为: %1 (参数值: %2)").arg(getModeString()).arg(m_parameterValue));
         emit currentModeChanged();
+        emit parameterValueChanged();
     }
 }
 
@@ -131,6 +163,69 @@ void MotorModeControlManager::setParameterValue(double value)
     emit parameterValueChanged();
 }
 
+void MotorModeControlManager::setTorqueParameter(double value)
+{
+    if (qFuzzyCompare(m_torqueParameter, value)) {
+        return;
+    }
+    
+    // 参数值范围限制 (0 到 100)
+    if (value < 0.0) value = 0.0;
+    if (value > 100.0) value = 100.0;
+    
+    m_torqueParameter = value;
+    
+    // 如果当前是力矩模式，更新目标值
+    if (m_currentMode == TORQUE_MODE) {
+        updateTargetValueFromParameter();
+    }
+    
+    log(QString("力矩模式参数值设置为: %1").arg(value));
+    emit torqueParameterChanged();
+}
+
+void MotorModeControlManager::setSpeedParameter(double value)
+{
+    if (qFuzzyCompare(m_speedParameter, value)) {
+        return;
+    }
+    
+    // 参数值范围限制 (0 到 100)
+    if (value < 0.0) value = 0.0;
+    if (value > 100.0) value = 100.0;
+    
+    m_speedParameter = value;
+    
+    // 如果当前是速度模式，更新目标值
+    if (m_currentMode == SPEED_MODE) {
+        updateTargetValueFromParameter();
+    }
+    
+    log(QString("速度模式参数值设置为: %1").arg(value));
+    emit speedParameterChanged();
+}
+
+void MotorModeControlManager::setPositionParameter(double value)
+{
+    if (qFuzzyCompare(m_positionParameter, value)) {
+        return;
+    }
+    
+    // 参数值范围限制 (0 到 100)
+    if (value < 0.0) value = 0.0;
+    if (value > 100.0) value = 100.0;
+    
+    m_positionParameter = value;
+    
+    // 如果当前是位置模式，更新目标值
+    if (m_currentMode == POSITION_MODE) {
+        updateTargetValueFromParameter();
+    }
+    
+    log(QString("位置模式参数值设置为: %1").arg(value));
+    emit positionParameterChanged();
+}
+
 // QML可调用方法
 void MotorModeControlManager::toggleEnable()
 {
@@ -196,19 +291,24 @@ void MotorModeControlManager::sendControlCommand()
 // 私有方法
 void MotorModeControlManager::updateTargetValueFromParameter()
 {
-    // 将参数值 (0-100) 转换为对应模式的目标值范围
+    // 根据当前模式将对应模式的参数值(0-100)转换为对应的目标值范围
     switch (m_currentMode) {
     case TORQUE_MODE:
-        // 参数值 0-100 映射到力矩 -100 Nm 到 100 Nm
-        setTargetTorque((m_parameterValue - 50.0) * 2.0);
+        // 力矩模式: 力矩参数值0-100映射到-100~100Nm
+        setTargetTorque(m_torqueParameter * 2.0 - 100.0); // 0对应-100Nm, 50对应0Nm, 100对应100Nm
+        log(QString("力矩模式目标值更新: %1 Nm (参数值: %2)").arg(m_targetTorque).arg(m_torqueParameter));
         break;
+        
     case SPEED_MODE:
-        // 参数值 0-100 映射到速度 -3000 RPM 到 3000 RPM
-        setTargetSpeed((m_parameterValue - 50.0) * 60.0);
+        // 速度模式: 速度参数值0-100映射到-3000~3000RPM
+        setTargetSpeed(m_speedParameter * 60.0 - 3000.0); // 0对应-3000RPM, 50对应0RPM, 100对应3000RPM
+        log(QString("速度模式目标值更新: %1 RPM (参数值: %2)").arg(m_targetSpeed).arg(m_speedParameter));
         break;
+        
     case POSITION_MODE:
-        // 参数值 0-100 映射到位置 -360 度 到 360 度
-        setTargetPosition((m_parameterValue - 50.0) * 7.2);
+        // 位置模式: 位置参数值0-100映射到-360~360度
+        setTargetPosition(m_positionParameter * 7.2 - 360.0); // 0对应-360度, 50对应0度, 100对应360度
+        log(QString("位置模式目标值更新: %1 度 (参数值: %2)").arg(m_targetPosition).arg(m_positionParameter));
         break;
     }
 }

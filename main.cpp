@@ -35,8 +35,13 @@ int main(int argc, char *argv[])
                                                  return new FOCChartManager();
                                              });
     
-    // 注册电机模式控制管理器
-    qmlRegisterType<MotorModeControlManager>("FOC_CTRL", 1, 0, "MotorModeControlManager");
+    // 注册电机模式控制管理器为单例
+    qmlRegisterSingletonType<MotorModeControlManager>("FOC_CTRL", 1, 0, "MotorModeControlManager",
+                                                     [](QQmlEngine *engine, QJSEngine *scriptEngine) -> QObject * {
+                                                         Q_UNUSED(engine)
+                                                         Q_UNUSED(scriptEngine)
+                                                         return new MotorModeControlManager();
+                                                     });
     
     // 连接串口通信管理器到图表管理器，用于接收实时数据
     // 在C++层面直接建立信号连接，避免QML中转

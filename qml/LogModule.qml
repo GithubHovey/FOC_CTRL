@@ -16,6 +16,22 @@ Rectangle {
     
     signal logLevelChanged()
     signal clearLogRequested()
+    
+    function addLogMessage(message) {
+        // 添加时间戳
+        var timestamp = new Date().toLocaleTimeString()
+        var formattedMessage = "[" + timestamp + "] " + message
+        
+        // 添加到日志内容
+        if (logContentText.text === qsTr("日志显示区域")) {
+            logContentText.text = formattedMessage
+        } else {
+            logContentText.text += "\n" + formattedMessage
+        }
+        
+        // 自动滚动到底部
+        logContentText.cursorPosition = logContentText.text.length
+    }
 
     ColumnLayout {
         anchors.fill: parent

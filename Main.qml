@@ -5,6 +5,7 @@ import QtCharts
 
 // 导入自定义模块
 import "qml"
+import FOC_CTRL 1.0
 
 ApplicationWindow {
     id: mainWindow
